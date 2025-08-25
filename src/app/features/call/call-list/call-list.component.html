@@ -1,21 +1,42 @@
-<ul>
-  <li *ngFor="let call of calls">
-    <a
-      class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b cursor-pointer"
-      (click)="selectCall(call.id)"
-    >
+<div class="bg-white dark:bg-gray-800">
+  <div
+    *ngFor="let call of calls"
+    class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+    (click)="selectCall(call.id)"
+    [class.bg-green-50]="call.id === selectedCallId"
+    [class.dark:bg-green-900]="call.id === selectedCallId"
+    [class.border-l-4]="call.id === selectedCallId"
+    [class.border-l-green-500]="call.id === selectedCallId"
+  >
+    <div class="relative">
       <img
         [src]="call.avatar"
-        class="w-12 h-12 rounded-full border"
+        class="w-12 h-12 rounded-full object-cover"
         alt="avatar"
       />
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center justify-between">
-          <p class="font-medium truncate">{{ call.name }}</p>
-          <span class="text-xs text-gray-500">{{ call.time }}</span>
-        </div>
-        <p class="text-sm text-gray-500 truncate">{{ call.type }}</p>
+    </div>
+
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center justify-between mb-1">
+        <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ call.name }}</h3>
+        <span class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">{{ call.time }}</span>
       </div>
-    </a>
-  </li>
-</ul>
+      <div class="flex items-center gap-2">
+        <i class="fas fa-phone-alt text-xs" 
+           [class.text-green-600]="call.type === 'Incoming'"
+           [class.text-red-600]="call.type === 'Missed'"
+           [class.text-blue-600]="call.type === 'Outgoing'"></i>
+        <p class="text-sm text-gray-600 dark:text-gray-300 truncate">{{ call.type }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div
+    *ngIf="calls.length === 0"
+    class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400"
+  >
+    <i class="fas fa-phone text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
+    <p class="text-lg font-medium">No calls yet</p>
+    <p class="text-sm">Your call history will appear here</p>
+  </div>
+</div>

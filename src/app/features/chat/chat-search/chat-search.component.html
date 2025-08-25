@@ -1,41 +1,29 @@
-<div class="p-3 border-b bg-white relative">
+<div class="p-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 relative">
   <div class="relative">
     <input
       type="text"
       placeholder="Search or start new chat"
-      class="w-full px-4 py-2 pl-10 bg-gray-100 rounded-full outline-none text-sm focus:bg-white focus:ring-2 focus:ring-green-500"
+      class="w-full px-4 py-2 pl-10 bg-gray-100 dark:bg-gray-700 rounded-full outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-green-500"
       [(ngModel)]="searchTerm"
       (input)="onSearch()"
       (focus)="showContacts = true"
       (blur)="hideContacts()"
     />
-    <i
-      class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-    ></i>
+    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
   </div>
-
-  <div
-    *ngIf="showContacts && searchTerm"
-    class="absolute z-50 w-[80%] bg-white border rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto left-0 right-0 mx-auto"
-  >
-    <div class="p-2 text-xs text-gray-500 font-medium uppercase tracking-wide">
-      Contacts
-    </div>
-    <div
-      *ngFor="let contact of filteredContacts"
-      class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 cursor-pointer"
-      (mousedown)="startChatWithContact(contact)"
-    >
+  
+  <div *ngIf="showContacts && searchTerm" class="absolute z-50 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto left-0 right-0">
+    <div class="p-2 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Contacts</div>
+    <div *ngFor="let contact of filteredContacts" 
+         class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+         (mousedown)="startChatWithContact(contact)">
       <img [src]="contact.avatar" class="w-10 h-10 rounded-full" alt="avatar" />
       <div>
-        <p class="font-medium text-sm">{{ contact.name }}</p>
-        <p class="text-xs text-gray-500">{{ contact.phone }}</p>
+        <p class="font-medium text-sm text-gray-900 dark:text-gray-100">{{ contact.name }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400">{{ contact.phone }}</p>
       </div>
     </div>
-    <div
-      *ngIf="filteredContacts.length === 0"
-      class="p-4 text-center text-gray-500 text-sm"
-    >
+    <div *ngIf="filteredContacts.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
       No contacts found
     </div>
   </div>

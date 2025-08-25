@@ -14,14 +14,22 @@ interface SidebarItem {
 export class SidebarComponent implements OnInit {
   sidebarItems: SidebarItem[] = [
     { label: 'Chats', icon: 'fas fa-comments', route: 'chat' },
-    { label: 'Calls', icon: 'fas fa-phone', route: 'call' },
     { label: 'Status', icon: 'fas fa-circle-notch', route: 'status' },
+    { label: 'Calls', icon: 'fas fa-phone', route: 'call' },
   ];
 
-  constructor(private router: Router) { }
+  settingsItem: SidebarItem = { label: 'Settings', icon: 'fas fa-cog', route: 'settings' };
+
+  activeRoute: string = '';
+
+  constructor(private router: Router) {
+    this.router.events.subscribe(() => {
+      this.activeRoute = this.router.url.split('/')[2] || '';
+    });
+  }
+
   ngOnInit(): void {
-    console.log('🔧 Sidebar loaded');
-    console.log('🔧 Current route on sidebar init:', this.router.url);
+    this.activeRoute = this.router.url.split('/')[2] || '';
   }
 
   navigate(item: SidebarItem) {

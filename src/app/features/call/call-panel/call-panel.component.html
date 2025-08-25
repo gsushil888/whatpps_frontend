@@ -1,35 +1,48 @@
-<div *ngIf="callId; else noCallSelected" class="flex flex-col h-full">
-  <div class="h-14 px-4 flex items-center justify-between border-b bg-gray-50">
-    <div class="flex items-center gap-2">
-      <img src="assets/google.svg" class="w-8 h-8 rounded-full" alt="call" />
-      <span class="font-medium">Call {{ callId }}</span>
+<div *ngIf="callId; else noCallSelected" class="flex flex-col h-full bg-white dark:bg-gray-800">
+  <!-- Call Header -->
+  <div class="h-16 px-4 flex items-center justify-between border-b bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
+    <div class="flex items-center gap-3">
+      <img src="assets/google.svg" class="w-10 h-10 rounded-full object-cover" alt="call" />
+      <div>
+        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Call with {{ callId }}</h3>
+        <p class="text-xs text-green-600 dark:text-green-400">Active call</p>
+      </div>
     </div>
-    <div class="flex items-center gap-2 text-gray-600 text-lg">
-      <button class="p-2 hover:bg-gray-200 rounded-full">
-        <i class="fa-solid fa-phone"></i>
+    <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
+      <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <i class="fas fa-microphone text-lg"></i>
       </button>
-      <button class="p-2 hover:bg-gray-200 rounded-full">
-        <i class="fa-solid fa-video"></i>
+      <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <i class="fas fa-video text-lg"></i>
+      </button>
+      <button 
+        class="p-2 bg-red-600 hover:bg-red-700 text-white rounded-full transition-colors"
+        (click)="endCall()">
+        <i class="fas fa-phone-slash text-lg"></i>
       </button>
     </div>
   </div>
 
-  <div class="flex-1 flex items-center justify-center bg-black text-white">
-    <p class="text-lg">In call with user {{ callId }}...</p>
-  </div>
-
-  <div
-    class="h-14 px-3 flex items-center justify-center gap-3 border-t bg-white"
-  >
-    <button class="px-4 py-2 rounded bg-red-600 text-white" (click)="endCall()">
-      End Call
-    </button>
+  <!-- Call Content -->
+  <div class="flex-1 flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+    <div class="text-center">
+      <div class="w-32 h-32 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mb-4 flex items-center justify-center">
+        <i class="fas fa-user text-4xl text-gray-500 dark:text-gray-400"></i>
+      </div>
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Call {{ callId }}</h2>
+      <p class="text-gray-600 dark:text-gray-400">00:45</p>
+    </div>
   </div>
 </div>
 
 <ng-template #noCallSelected>
-  <div class="flex flex-col items-center justify-center h-full text-gray-500">
-    <i class="fa-solid fa-phone text-5xl mb-4"></i>
-    <p class="text-lg font-medium">Select a call to view details</p>
+  <div class="flex flex-col items-center justify-center h-full bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">
+    <div class="text-center">
+      <i class="fas fa-phone text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">Make a call</h2>
+      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
+        Select a contact from your call history to start a call.
+      </p>
+    </div>
   </div>
 </ng-template>

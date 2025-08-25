@@ -5,12 +5,14 @@ import { RouterModule } from '@angular/router';
 import { LoaderComponent } from './components/loader/loader.component';
 import { SkeletonLoaderComponent } from './components/skeleton-loader/skeleton-loader.component';
 import { ProblemPageComponent } from './components/problem-page/problem-page.component';
+import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
 
 @NgModule({
     declarations: [
         SkeletonLoaderComponent,
         LoaderComponent,
         ProblemPageComponent,
+        ThemeToggleComponent,
     ],
     imports: [
         CommonModule,
@@ -18,7 +20,8 @@ import { ProblemPageComponent } from './components/problem-page/problem-page.com
     ],
     exports: [
         SkeletonLoaderComponent,
-        LoaderComponent
+        LoaderComponent,
+        ThemeToggleComponent
     ]
 })
 export class SharedModule { }

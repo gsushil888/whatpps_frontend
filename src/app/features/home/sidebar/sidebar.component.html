@@ -1,22 +1,61 @@
 <aside
-  class="w-full h-full flex flex-col items-center bg-[#f7f5f3] border-r border-gray-100"
+  class="w-full h-full flex flex-col items-center bg-gray-50 dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700"
 >
-  <nav class="flex-1 flex flex-col gap-6 mt-6 text-gray-500 text-xl">
+  <nav class="flex-1 flex flex-col gap-6 mt-6 text-gray-500 dark:text-gray-400 text-xl">
     <button
       *ngFor="let item of sidebarItems"
-      class="relative group hover:text-green-600"
+      class="relative group p-3 rounded-lg transition-colors"
+      [class.text-green-600]="activeRoute === item.route"
+      [class.dark:text-green-400]="activeRoute === item.route"
+      [class.bg-green-100]="activeRoute === item.route"
+      [class.dark:bg-green-900]="activeRoute === item.route"
+      [class.text-gray-500]="activeRoute !== item.route"
+      [class.dark:text-gray-400]="activeRoute !== item.route"
+      [class.hover:text-green-600]="activeRoute !== item.route"
+      [class.dark:hover:text-green-400]="activeRoute !== item.route"
+      [class.hover:bg-gray-100]="activeRoute !== item.route"
+      [class.dark:hover:bg-gray-700]="activeRoute !== item.route"
       (click)="navigate(item)"
     >
       <i [class]="item.icon"></i>
       <span
-        class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded hidden group-hover:block"
+        class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-800 dark:bg-gray-600 text-white text-xs px-2 py-1 rounded hidden group-hover:block z-10"
       >
         {{ item.label }}
       </span>
     </button>
   </nav>
 
-  <div class="p-3">
-    <img src="assets/google.svg" class="w-8 h-8 rounded-full" alt="me" />
+  <div class="flex flex-col gap-3 p-3">
+    <button
+      class="relative group p-3 rounded-lg transition-colors text-xl"
+      [class.text-green-600]="activeRoute === settingsItem.route"
+      [class.dark:text-green-400]="activeRoute === settingsItem.route"
+      [class.bg-green-100]="activeRoute === settingsItem.route"
+      [class.dark:bg-green-900]="activeRoute === settingsItem.route"
+      [class.text-gray-500]="activeRoute !== settingsItem.route"
+      [class.dark:text-gray-400]="activeRoute !== settingsItem.route"
+      [class.hover:text-green-600]="activeRoute !== settingsItem.route"
+      [class.dark:hover:text-green-400]="activeRoute !== settingsItem.route"
+      [class.hover:bg-gray-100]="activeRoute !== settingsItem.route"
+      [class.dark:hover:bg-gray-700]="activeRoute !== settingsItem.route"
+      (click)="navigate(settingsItem)"
+    >
+      <i [class]="settingsItem.icon"></i>
+      <span
+        class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-800 dark:bg-gray-600 text-white text-xs px-2 py-1 rounded hidden group-hover:block z-10"
+      >
+        {{ settingsItem.label }}
+      </span>
+    </button>
+    
+    <div class="relative group p-3 rounded-lg transition-colors">
+      <img src="assets/google.svg" class="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600" alt="me" />
+      <span
+        class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-800 dark:bg-gray-600 text-white text-xs px-2 py-1 rounded hidden group-hover:block z-10"
+      >
+        Profile
+      </span>
+    </div>
   </div>
 </aside>

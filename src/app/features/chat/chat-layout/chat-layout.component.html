@@ -1,9 +1,11 @@
-<div class="flex h-full bg-white">
+<div class="flex h-full bg-white dark:bg-gray-900">
   <!-- Left Panel -->
-  <div class="w-[400px] border-r border-gray-200 flex flex-col bg-white">
+  <div
+    class="w-[400px] border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800"
+  >
     <!-- Header -->
     <div
-      class="h-16 bg-gray-100 border-b border-gray-200 flex items-center justify-between px-4"
+      class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between px-4"
     >
       <div class="flex items-center gap-3">
         <img
@@ -11,7 +13,7 @@
           class="w-10 h-10 rounded-full"
           alt="profile"
         />
-        <h1 class="font-semibold text-gray-800">Chats</h1>
+        <h1 class="font-semibold text-gray-800 dark:text-gray-200">Chats</h1>
       </div>
       <app-new-chat></app-new-chat>
     </div>
@@ -26,7 +28,7 @@
   </div>
 
   <!-- Right Panel -->
-  <div class="flex-1 bg-gray-50">
+  <div class="flex-1 bg-gray-50 dark:bg-gray-900">
     <app-chat-window></app-chat-window>
   </div>
 </div>

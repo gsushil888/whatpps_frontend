@@ -1,0 +1,22 @@
+<div class="flex h-full bg-white dark:bg-gray-900">
+  <!-- Left Panel -->
+  <div class="w-[400px] border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800">
+    <!-- Header -->
+    <div class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between px-4">
+      <div class="flex items-center gap-3">
+        <img src="assets/google.svg" class="w-10 h-10 rounded-full" alt="profile" />
+        <h1 class="font-semibold text-gray-800 dark:text-gray-200">Calls</h1>
+      </div>
+    </div>
+    
+    <!-- Call List -->
+    <div class="flex-1 overflow-y-auto">
+      <app-call-list></app-call-list>
+    </div>
+  </div>
+  
+  <!-- Right Panel -->
+  <div class="flex-1 bg-gray-50 dark:bg-gray-900">
+    <app-call-panel></app-call-panel>
+  </div>
+</div>

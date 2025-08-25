@@ -19,6 +19,10 @@ const routes: Routes = [
                 path: 'status',
                 loadChildren: () => import('../status/status.module').then(m => m.StatusModule)
             },
+            {
+                path: 'settings',
+                loadChildren: () => import('../settings/settings.module').then(m => m.SettingsModule)
+            },
             { path: '', redirectTo: 'chat', pathMatch: 'full' }
         ]
     }

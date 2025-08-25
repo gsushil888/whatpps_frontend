@@ -1,9 +1,10 @@
-<div class="bg-white">
+<div class="bg-white dark:bg-gray-800">
   <div
     *ngFor="let chat of chats"
-    class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition-colors"
+    class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
     (click)="selectChat(chat.id)"
     [class.bg-green-50]="chat.id === selectedChatId"
+    [class.dark:bg-green-900]="chat.id === selectedChatId"
     [class.border-l-4]="chat.id === selectedChatId"
     [class.border-l-green-500]="chat.id === selectedChatId"
   >
@@ -20,13 +21,13 @@
 
     <div class="flex-1 min-w-0">
       <div class="flex items-center justify-between mb-1">
-        <h3 class="font-semibold text-gray-900 truncate">{{ chat.name }}</h3>
-        <span class="text-xs text-gray-500 flex-shrink-0 ml-2">{{
+        <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ chat.name }}</h3>
+        <span class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">{{
           chat.time
         }}</span>
       </div>
       <div class="flex items-center justify-between">
-        <p class="text-sm text-gray-600 truncate">{{ chat.lastMessage }}</p>
+        <p class="text-sm text-gray-600 dark:text-gray-300 truncate">{{ chat.lastMessage }}</p>
         <div class="flex items-center gap-1 flex-shrink-0 ml-2">
           <div
             class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"
@@ -40,9 +41,9 @@
 
   <div
     *ngIf="chats.length === 0"
-    class="flex flex-col items-center justify-center py-12 text-gray-500"
+    class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400"
   >
-    <i class="fas fa-comments text-4xl mb-4 text-gray-300"></i>
+    <i class="fas fa-comments text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
     <p class="text-lg font-medium">No chats yet</p>
     <p class="text-sm">Search for contacts to start chatting</p>
   </div>
