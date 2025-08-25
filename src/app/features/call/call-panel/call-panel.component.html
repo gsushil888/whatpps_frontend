@@ -1,0 +1,35 @@
+<div *ngIf="callId; else noCallSelected" class="flex flex-col h-full">
+  <div class="h-14 px-4 flex items-center justify-between border-b bg-gray-50">
+    <div class="flex items-center gap-2">
+      <img src="assets/google.svg" class="w-8 h-8 rounded-full" alt="call" />
+      <span class="font-medium">Call {{ callId }}</span>
+    </div>
+    <div class="flex items-center gap-2 text-gray-600 text-lg">
+      <button class="p-2 hover:bg-gray-200 rounded-full">
+        <i class="fa-solid fa-phone"></i>
+      </button>
+      <button class="p-2 hover:bg-gray-200 rounded-full">
+        <i class="fa-solid fa-video"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="flex-1 flex items-center justify-center bg-black text-white">
+    <p class="text-lg">In call with user {{ callId }}...</p>
+  </div>
+
+  <div
+    class="h-14 px-3 flex items-center justify-center gap-3 border-t bg-white"
+  >
+    <button class="px-4 py-2 rounded bg-red-600 text-white" (click)="endCall()">
+      End Call
+    </button>
+  </div>
+</div>
+
+<ng-template #noCallSelected>
+  <div class="flex flex-col items-center justify-center h-full text-gray-500">
+    <i class="fa-solid fa-phone text-5xl mb-4"></i>
+    <p class="text-lg font-medium">Select a call to view details</p>
+  </div>
+</ng-template>

@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* styles.css */
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
+
+/* Scrollbar thin for chat-like feel */
+.scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded;
+}
+
+/* Theme variables using Tailwind classes */
+:root {
+    /* Light Theme (WhatsApp Gradient) */
+    --bg-primary: linear-gradient(135deg, #25d366, #128c7e);
+    --text-primary: white;
+
+    /* Dark Theme */
+    --bg-dark: #075e54;
+    --text-dark: white;
+
+    /* Input text always dark */
+    --input-text: #111827;
+    /* Tailwind gray-900 */
+    --placeholder-text: #9ca3af;
+    /* Tailwind gray-400 */
+}
+
+/* Apply theme dynamically using classes on body or app-root */
+body.light {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+body.dark {
+    background: var(--bg-dark);
+    color: var(--text-dark);
+}
+
+/* Input / Select / Textarea styling (always dark text) */
+input,
+select,
+textarea {
+    color: var(--input-text);
+}
+
+::placeholder {
+    color: var(--placeholder-text);
+}
+
+/* Remove number input spinner */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+input[type=number] {
+    -moz-appearance: textfield;
+}

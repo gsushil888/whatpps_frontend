@@ -1,0 +1,34 @@
+<div class="problem-container">
+  <div class="problem-card">
+    <div class="icon">⚠️</div>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+
+    <div class="actions">
+      <button class="btn btn-retry" *ngIf="showRetry" (click)="retryConfirm()">
+        🔄 Retry
+      </button>
+      <button class="btn btn-home" (click)="goHome()">🏠 Go Home</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Retry Modal -->
+<div class="modal-backdrop" *ngIf="showConfirm">
+  <div class="modal">
+    <h2>Retry Action</h2>
+    <p>Do you want to retry the last action?</p>
+    <div class="modal-actions">
+      <button class="btn btn-confirm" (click)="proceedRetry()">
+        Yes, Retry
+      </button>
+      <button class="btn btn-cancel" (click)="cancelRetry()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loader -->
+<div class="loader-backdrop" *ngIf="loading">
+  <div class="loader"></div>
+  <p class="loader-text">Retrying, please wait...</p>
+</div>

@@ -1,0 +1,8 @@
+<!-- src/app/shared/components/loader/loader.component.html -->
+<!-- YouTube-like loader -->
+<div *ngIf="loader.progressLoader$ | async" class="youtube-loader"></div>
+
+<!-- Circular loader -->
+<div *ngIf="loader.spinnerLoader$ | async" class="spinner-backdrop">
+  <div class="spinner"></div>
+</div>

@@ -1,0 +1,135 @@
+<div class="min-h-screen flex items-center justify-center bg-whatsapp-gradient">
+  <div
+    class="bg-white shadow-xl rounded-2xl w-full max-w-md md:max-w-lg lg:max-w-xl p-6 md:p-8 overflow-hidden"
+  >
+    <!-- Desktop Header -->
+    <h2
+      *ngIf="!isMobileView"
+      class="text-2xl md:text-3xl font-bold text-center text-gray-800 mb-6"
+    >
+      Login
+    </h2>
+    <!-- Login Form -->
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-4">
+      <!-- Username (Desktop only) -->
+      <div *ngIf="!isMobileView && !isMobileFlow">
+        <input
+          type="email"
+          formControlName="username"
+          placeholder="Username / Email"
+          class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm sm:text-base"
+          (input)="onUsernameChange()"
+        />
+        <div
+          *ngIf="
+            loginForm.get('username')?.touched &&
+            loginForm.get('username')?.invalid
+          "
+          class="text-xs sm:text-sm text-red-500 mt-1"
+        >
+          Username / Email is required
+        </div>
+      </div>
+      <!-- Password (Desktop only, when username entered) -->
+      <div *ngIf="isUsernameFlow && !isMobileView">
+        <input
+          type="password"
+          formControlName="password"
+          placeholder="Password"
+          class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:outline-none text-sm sm:text-base"
+        />
+        <div
+          *ngIf="
+            loginForm.get('password')?.touched &&
+            loginForm.get('password')?.invalid
+          "
+          class="text-xs sm:text-sm text-red-500 mt-1"
+        >
+          Password is required (min 6 characters)
+        </div>
+      </div>
+      <!-- OR Separator (Desktop only, when not in username flow) -->
+      <div
+        *ngIf="!isMobileView && !isUsernameFlow"
+        class="flex items-center my-4"
+      >
+        <hr class="flex-1 border-gray-300" />
+        <span class="px-2 text-gray-500 text-xs sm:text-sm">OR</span>
+        <hr class="flex-1 border-gray-300" />
+      </div>
+      <!-- Mobile Number (Mobile always OR Desktop when in mobile flow) -->
+      <div
+        *ngIf="
+          isMobileView || isMobileFlow || (!isMobileView && !isUsernameFlow)
+        "
+      >
+        <div
+          class="flex items-center border rounded-lg px-3 py-2 focus-within:ring-2 focus-within:ring-green-500"
+        >
+          <!-- Country Code -->
+          <select
+            formControlName="countryCode"
+            class="bg-transparent outline-none text-sm sm:text-base mr-2"
+          >
+            <option value="+91">🇮🇳 +91</option>
+            <option value="+1">🇺🇸 +1</option>
+            <option value="+44">🇬🇧 +44</option>
+            <option value="+61">🇦🇺 +61</option>
+            <option value="+81">🇯🇵 +81</option>
+          </select>
+          <!-- Phone input -->
+          <input
+            type="number"
+            formControlName="mobile"
+            placeholder="Phone number"
+            class="flex-1 outline-none text-sm sm:text-base no-spinner"
+            (input)="onMobileChange()"
+          />
+        </div>
+        <div
+          *ngIf="
+            loginForm.get('mobile')?.touched && loginForm.get('mobile')?.invalid
+          "
+          class="text-xs sm:text-sm text-red-500 mt-1"
+        >
+          Enter a valid mobile number
+        </div>
+      </div>
+      <!-- Submit -->
+      <button
+        type="submit"
+        [disabled]="
+          (!isUsernameFlow && !isMobileFlow) ||
+          (isUsernameFlow && loginForm.get('password')?.invalid) ||
+          (isMobileFlow && loginForm.get('mobile')?.invalid)
+        "
+        class="w-full bg-green-600 text-white py-2 sm:py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50 text-sm sm:text-base"
+      >
+        Login
+      </button>
+    </form>
+    <!-- Extra Links (only desktop) -->
+    <div
+      class="hidden md:flex flex-col items-center mt-6 space-y-3 text-xs sm:text-sm md:text-base"
+    >
+      <a
+        routerLink="/auth/register"
+        class="text-green-600 font-medium hover:underline"
+      >
+        Create an account
+      </a>
+      <button
+        type="button"
+        (click)="loginWithGoogle()"
+        class="flex items-center justify-center w-full bg-red-500 text-white py-2 sm:py-3 rounded-lg hover:bg-red-600 transition"
+      >
+        <img
+          src="assets/google.svg"
+          alt="Google"
+          class="w-4 h-4 sm:w-5 sm:h-5 mr-2"
+        />
+        Continue with Google
+      </button>
+    </div>
+  </div>
+</div>

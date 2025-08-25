@@ -1,0 +1,21 @@
+<ul>
+  <li *ngFor="let call of calls">
+    <a
+      class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 border-b cursor-pointer"
+      (click)="selectCall(call.id)"
+    >
+      <img
+        [src]="call.avatar"
+        class="w-12 h-12 rounded-full border"
+        alt="avatar"
+      />
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between">
+          <p class="font-medium truncate">{{ call.name }}</p>
+          <span class="text-xs text-gray-500">{{ call.time }}</span>
+        </div>
+        <p class="text-sm text-gray-500 truncate">{{ call.type }}</p>
+      </div>
+    </a>
+  </li>
+</ul>

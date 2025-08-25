@@ -1,0 +1,95 @@
+<div
+  class="min-h-screen flex items-center justify-center bg-whatsapp-gradient-light dark:bg-whatsapp-gradient-dark p-4"
+>
+  <div
+    class="auth-card w-full max-w-md p-6 md:p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-lg"
+  >
+    <h2
+      class="text-2xl md:text-3xl font-bold text-center text-gray-800 dark:text-white mb-6"
+    >
+      Create Account
+    </h2>
+
+    <form [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-4">
+      <!-- First & Last Name -->
+      <div class="grid grid-cols-2 gap-3">
+        <input
+          type="text"
+          formControlName="firstname"
+          placeholder="First Name"
+          class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-green-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+        />
+        <input
+          type="text"
+          formControlName="lastname"
+          placeholder="Last Name"
+          class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-green-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+        />
+      </div>
+
+      <!-- Nickname -->
+      <input
+        type="text"
+        formControlName="nickname"
+        placeholder="Nickname"
+        class="w-full border rounded-lg p-2 focus:ring-2 focus:ring-green-500 focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400"
+      />
+
+      <!-- Profile Picture Upload -->
+      <div class="space-y-2">
+        <label
+          class="block text-sm font-medium text-gray-700 dark:text-gray-200"
+          >Upload Profile Picture</label
+        >
+        <input
+          type="file"
+          (change)="onFileChange($event)"
+          class="text-gray-700 dark:text-gray-200"
+        />
+        <div *ngIf="profilePicPreview" class="mt-2">
+          <img
+            [src]="profilePicPreview"
+            alt="Preview"
+            class="w-16 h-16 rounded-full border"
+          />
+        </div>
+      </div>
+
+      <!-- Avatar Selection -->
+      <div>
+        <label
+          class="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-200"
+          >Choose Avatar</label
+        >
+        <div class="grid grid-cols-4 gap-3">
+          <div
+            *ngFor="let avatar of avatars"
+            (click)="onAvatarSelect(avatar)"
+            [class.border-green-500]="selectedAvatar === avatar"
+            class="cursor-pointer border rounded-lg p-1 hover:shadow-md transition"
+          >
+            <img [src]="avatar" class="w-14 h-14 rounded-full" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button
+        type="submit"
+        [disabled]="!registerForm.valid"
+        class="w-full py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+      >
+        Register
+      </button>
+    </form>
+
+    <p class="text-center mt-4 text-sm text-gray-700 dark:text-gray-300">
+      Already have an account?
+      <a
+        routerLink="/auth/login"
+        class="text-green-600 dark:text-green-400 font-medium hover:underline"
+        >Login</a
+      >
+    </p>
+  </div>
+</div>
