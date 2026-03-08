@@ -1,7 +1,11 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { TokenService } from 'src/app/core/services/token.service';
+import { PresenceService } from 'src/app/core/services/presence.service';
 import { Chat, ChatService } from '../services/chat.service';
+import { ConversationMessage, ConversationService } from '../services/conversation.service';
+import { WebSocketService } from '../services/websocket.service';
 
 @Component({
   selector: 'app-chat-window',
@@ -10,31 +14,71 @@ import { Chat, ChatService } from '../services/chat.service';
 export class ChatWindowComponent implements OnInit, OnDestroy {
   chatId: string | null = null;
   currentChat: Chat | null = null;
+  conversationType: string = 'INDIVIDUAL';
   newMessage: string = '';
   showAttachmentModal = false;
-
-  messages = [
-    { text: 'Hey! Long time.', type: 'received' },
-    { text: 'Yeah! How have you been?', type: 'sent' },
-    { text: 'Doing great, thanks 😊', type: 'received' }
-  ];
+  showChatInfo = false;
+  showMenuModal = false;
+  showImageModal = false;
+  selectedImage: string = '';
+  activeFilter: string = 'all';
+  messages: ConversationMessage[] = [];
+  isUploadingFile = false;
+  uploadingImagePreview: string | null = null;
+  stream: MediaStream | null = null;
+  streamActive = false;
+  capturedPhoto: string | null = null;
+  isLoadingMessages = false;
+  hasMoreMessages = true;
+  stickyDate = '';
+  showStickyDate = false;
+  private scrollTimeout: any;
   private destroy$ = new Subject<void>();
 
-  constructor(private chatService: ChatService) { }
+  @ViewChild('video') videoElement!: ElementRef<HTMLVideoElement>;
+  @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
+
+  constructor(
+    private chatService: ChatService,
+    private conversationService: ConversationService,
+    private tokenService: TokenService,
+    private webSocketService: WebSocketService,
+    private presenceService: PresenceService
+  ) { }
 
   ngOnInit(): void {
     this.chatService.selectedChatId$
       .pipe(takeUntil(this.destroy$))
       .subscribe(chatId => {
         this.chatId = chatId;
+        console.log('🔵 Selected conversation ID:', chatId);
+        this.showChatInfo = false;
         this.loadCurrentChat();
+      });
+
+    this.chatService.activeFilter$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(filter => {
+        this.activeFilter = filter;
+      });
+
+    // Subscribe to WebSocket messages
+    this.webSocketService.message$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(message => {
+        console.log('📨 WebSocket message received:', message);
+        if (message) {
+          console.log('✅ Adding message to current conversation');
+          this.addMessageToList(message);
+        }
       });
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-    this.stopStream();
+    this.stopCamera();
+    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
   }
 
   loadCurrentChat() {
@@ -42,7 +86,45 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       this.chatService.chats$
         .pipe(takeUntil(this.destroy$))
         .subscribe(chats => {
+          console.log("Chats Loaded", chats);
           this.currentChat = chats.find(chat => chat.id === this.chatId) || null;
+        });
+      this.loadMessages();
+
+      // Subscribe to conversation topic for real-time messages
+      const conversationId = parseInt(this.chatId);
+      console.log('🔔 Subscribing to conversation:', conversationId);
+      this.webSocketService.subscribeToConversation(conversationId);
+    }
+  }
+
+  loadMessages() {
+    if (this.chatId) {
+      this.messages = [];
+      this.hasMoreMessages = true;
+      this.isLoadingMessages = true;
+      this.conversationService.getConversationMessages(this.chatId, 50)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (response) => {
+            if (response.success) {
+              this.messages = response.data.messages.reverse();
+              this.hasMoreMessages = response.data.pagination.hasNext;
+              setTimeout(() => this.scrollToBottom(), 0);
+            }
+            this.isLoadingMessages = false;
+          },
+          error: (err) => {
+            console.error('Error loading messages:', err);
+            this.isLoadingMessages = false;
+          }
+        });
+
+      this.chatService.chats$
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(chats => {
+          const chat = chats.find(c => c.id === this.chatId);
+          this.conversationType = chat?.type || 'INDIVIDUAL';
         });
     }
   }
@@ -51,14 +133,138 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     return this.currentChat?.name || 'Unknown';
   }
 
-  sendMessage() {
-    if (this.newMessage.trim()) {
-      this.messages.push({
-        text: this.newMessage,
-        type: 'sent'
-      });
-      this.newMessage = '';
+  getChatOnlineStatus(): string {
+    if (!this.currentChat || this.currentChat.type === 'GROUP') return '';
+    if (this.currentChat.isOnline) return 'online';
+    if (!this.currentChat.lastActiveAt) return '';
+    
+    const lastActive = new Date(this.currentChat.lastActiveAt);
+    if (isNaN(lastActive.getTime())) return '';
+    
+    const now = new Date();
+    const diffMs = now.getTime() - lastActive.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    
+    if (diffMins < 1) return 'last seen just now';
+    if (diffMins < 60) return `last seen ${diffMins} minutes ago`;
+    if (diffMins < 1440) return `last seen ${Math.floor(diffMins / 60)} hours ago`;
+    return `last seen ${Math.floor(diffMins / 1440)} days ago`;
+  }
+
+  isCurrentChatOnline(): boolean {
+    return this.currentChat?.isOnline === true;
+  }
+
+  isCurrentUser(senderId: number): boolean {
+    const currentUserId = this.tokenService.getUserId();
+    return currentUserId ? senderId === parseInt(currentUserId) : false;
+  }
+
+  isGroupChat(): boolean {
+    return this.conversationType === 'GROUP';
+  }
+
+  shouldShowSenderName(msg: ConversationMessage, index: number): boolean {
+    if (!this.isGroupChat() || this.isCurrentUser(msg.senderId)) return false;
+    if (index === 0) return true;
+    return this.messages[index - 1].senderId !== msg.senderId;
+  }
+
+  getSenderDisplayName(msg: ConversationMessage): string {
+    if (this.isCurrentUser(msg.senderId)) {
+      return 'You';
     }
+    return msg.senderName;
+  }
+
+  formatTime(timestamp: string): string {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  shouldShowDateSeparator(msg: ConversationMessage, index: number): boolean {
+    if (index === 0) return true;
+    const currentDate = new Date(msg.createdAt).toDateString();
+    const previousDate = new Date(this.messages[index - 1].createdAt).toDateString();
+    return currentDate !== previousDate;
+  }
+
+  getDateLabel(timestamp: string): string {
+    const messageDate = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  }
+
+  sendMessage() {
+    if (this.newMessage.trim() && this.chatId) {
+      const conversationId = parseInt(this.chatId);
+      const message = {
+        messageType: 'TEXT',
+        content: this.newMessage
+      };
+
+      console.log('📤 Sending message to conversation:', conversationId);
+      console.log('📝 Message content:', message);
+
+      this.webSocketService.sendMessage(conversationId, message);
+      this.newMessage = '';
+    } else {
+      console.warn('⚠️ Cannot send message. Message empty or no conversation selected');
+      console.log('Current chatId:', this.chatId, 'Message:', this.newMessage);
+    }
+  }
+
+  private addMessageToList(message: any, skipIfDuplicate: boolean = true) {
+    console.log('➕ Adding message to list:', message);
+    console.log('Message type:', message.messageType);
+    console.log('Media metadata:', message.mediaMetadata);
+    console.log('Media URL:', message.mediaUrl);
+    console.log('Is uploading:', message.isUploading);
+
+    // Skip duplicate check for text messages to allow same content
+    if (skipIfDuplicate && this.messages.length > 0 && message.messageType !== 'TEXT') {
+      const lastMsg = this.messages[this.messages.length - 1];
+      const timeDiff = Math.abs(new Date(message.createdAt).getTime() - new Date(lastMsg.createdAt).getTime());
+      if (lastMsg.senderId === message.senderId &&
+        lastMsg.messageType === message.messageType &&
+        timeDiff < 3000) {
+        console.log('⚠️ Skipping duplicate message');
+        return;
+      }
+    }
+
+    const newMessage: ConversationMessage = {
+      id: message.id,
+      senderId: message.senderId,
+      senderName: message.senderName || 'Unknown',
+      senderMobileNumber: message.senderMobileNumber,
+      senderAvatar: message.senderAvatar || '',
+      content: message.content,
+      messageType: message.messageType,
+      isEdited: false,
+      deliveryStatus: message.deliveryStatus || { read: 0, delivered: 0, sent: 1 },
+      reactions: message.reactions || [],
+      mediaMetadata: message.mediaMetadata ? {
+        ...message.mediaMetadata,
+        thumbnail: message.mediaMetadata.thumbnail || message.mediaUrl
+      } : undefined,
+      mediaUrl: message.mediaUrl,
+      isUploading: message.isUploading || false,
+      createdAt: message.createdAt || new Date().toISOString()
+    };
+    this.messages.push(newMessage);
+    console.log('✅ Message added. Total messages:', this.messages.length);
+    console.log('Full message object:', newMessage);
+    setTimeout(() => this.scrollToBottom(), 100);
   }
 
   // ---------------------- Attachments ----------------------
@@ -68,7 +274,55 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   closeAttachmentModal() {
     this.showAttachmentModal = false;
-    // stop camera + mic if active
+    this.stopCamera();
+  }
+
+  openCameraAndMic() {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        this.stream = stream;
+        this.streamActive = true;
+        setTimeout(() => {
+          if (this.videoElement) {
+            this.videoElement.nativeElement.srcObject = stream;
+          }
+        }, 100);
+      })
+      .catch(err => console.error('Camera error:', err));
+  }
+
+  capturePhoto() {
+    if (!this.videoElement || !this.stream) return;
+
+    const video = this.videoElement.nativeElement;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+    
+    this.capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
+    this.stopCamera();
+  }
+
+  acceptPhoto() {
+    if (!this.capturedPhoto) return;
+
+    fetch(this.capturedPhoto)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        this.capturedPhoto = null;
+        this.closeAttachmentModal();
+        this.processImageUpload(file);
+      });
+  }
+
+  rejectPhoto() {
+    this.capturedPhoto = null;
+    this.openCameraAndMic();
+  }
+
+  private stopCamera() {
     if (this.stream) {
       this.stream.getTracks().forEach(track => track.stop());
       this.stream = null;
@@ -79,56 +333,247 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0) {
+    if (input.files && input.files.length > 0 && this.chatId) {
       const file = input.files[0];
-      console.log("Selected file:", file);
+      this.closeAttachmentModal();
+      if (file.type.startsWith('image/')) {
+        this.processImageUpload(file);
+      } else {
+        this.startUpload(file, input);
+      }
     }
   }
 
-  // ---------------------- Camera + Mic ----------------------
-  @ViewChild('video') videoRef!: ElementRef<HTMLVideoElement>;
+  private processImageUpload(file: File) {
+    this.isUploadingFile = true;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.uploadingImagePreview = e.target?.result as string;
+      this.addMessageToList({
+        senderId: parseInt(this.tokenService.getUserId()!),
+        senderName: 'You',
+        senderMobileNumber: '',
+        senderAvatar: '',
+        content: '',
+        messageType: 'IMAGE',
+        isEdited: false,
+        deliveryStatus: { read: 0, delivered: 0, sent: 0 },
+        reactions: [],
+        mediaMetadata: { thumbnail: this.uploadingImagePreview, fileName: file.name, size: file.size, mimeType: file.type },
+        isUploading: true,
+        createdAt: new Date().toISOString()
+      }, false);
+      setTimeout(() => this.startUpload(file, null), 2000);
+    };
+    reader.readAsDataURL(file);
+  }
 
-  stream: MediaStream | null = null;
-  streamActive = false;
-  showPermission = false;
+  private startUpload(file: File, input: HTMLInputElement | null) {
+    console.log('Upload started, isUploadingFile:', this.isUploadingFile);
 
-  async openCameraAndMic() {
-    try {
-      // Request camera + mic permissions
-      this.stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true
-      });
+    this.conversationService.uploadMedia(this.chatId!, file)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          console.log('File uploaded:', response);
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
 
-      this.streamActive = true;
+          if (response.success) {
+            const messageType = this.getMessageType(file.type);
+            const message: any = {
+              messageType: messageType,
+              content: '',
+              mediaUrl: response.data.fileUrl,
+              mediaMetadata: {
+                fileName: response.data.fileName,
+                size: response.data.fileSize,
+                mimeType: response.data.mimeType,
+                thumbnail: response.data.thumbnailUrl || response.data.fileUrl
+              },
+              replyToMessageId: null
+            };
 
-      // ✅ Wait for Angular to render <video> before attaching stream
-      setTimeout(() => {
-        if (this.videoRef && this.videoRef.nativeElement) {
-          this.videoRef.nativeElement.srcObject = this.stream;
+            if (messageType === 'IMAGE' || messageType === 'VIDEO') {
+              message.mediaMetadata.width = response.data.width || null;
+              message.mediaMetadata.height = response.data.height || null;
+            }
+
+            if (messageType === 'VIDEO' || messageType === 'AUDIO') {
+              message.mediaMetadata.duration = response.data.duration || null;
+            }
+
+            // Remove uploading message and add final message
+            const uploadingIndex = this.messages.findIndex(m => m.isUploading);
+            if (uploadingIndex !== -1) {
+              this.messages.splice(uploadingIndex, 1);
+            }
+
+            // Add final message
+            this.addMessageToList({
+              senderId: parseInt(this.tokenService.getUserId()!),
+              senderName: 'You',
+              senderMobileNumber: '',
+              senderAvatar: '',
+              content: message.content,
+              messageType: message.messageType,
+              isEdited: false,
+              deliveryStatus: { read: 0, delivered: 0, sent: 1 },
+              reactions: [],
+              mediaUrl: message.mediaUrl,
+              mediaMetadata: message.mediaMetadata,
+              createdAt: new Date().toISOString()
+            }, false);
+
+            this.webSocketService.sendMessage(parseInt(this.chatId!), message);
+          }
+          if (input) input.value = '';
+        },
+        error: (err) => {
+          console.error('Error uploading file:', err);
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
+
+          // Remove uploading message on error
+          const uploadingIndex = this.messages.findIndex(m => m.isUploading);
+          if (uploadingIndex !== -1) {
+            this.messages.splice(uploadingIndex, 1);
+          }
+
+          alert('Failed to upload file: ' + (err.error?.message || err.message));
+          if (input) input.value = '';
         }
-      }, 0);
+      });
+  }
 
-    } catch (err) {
-      console.error('Permission denied or error:', err);
-      alert('Could not access camera/microphone. Please allow permissions.');
+  private getMessageType(mimeType: string): string {
+    if (mimeType.startsWith('image/')) return 'IMAGE';
+    if (mimeType.startsWith('video/')) return 'VIDEO';
+    if (mimeType.startsWith('audio/')) return 'AUDIO';
+    return 'DOCUMENT';
+  }
+
+
+
+  // ---------------------- Chat Info ----------------------
+  toggleChatInfo() {
+    this.showChatInfo = !this.showChatInfo;
+  }
+
+  closeChatInfo() {
+    this.showChatInfo = false;
+  }
+
+  // ---------------------- Menu Modal ----------------------
+  toggleMenuModal() {
+    this.showMenuModal = !this.showMenuModal;
+  }
+
+  closeMenuModal() {
+    this.showMenuModal = false;
+  }
+
+  deleteChat() {
+    if (this.chatId && confirm('Are you sure you want to delete this conversation?')) {
+      this.conversationService.deleteConversation(this.chatId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (response) => {
+            if (response.success) {
+              this.chatService.removeChat(this.chatId!);
+              this.chatService.clearSelection();
+              this.showMenuModal = false;
+            }
+          },
+          error: (err) => console.error('Error deleting conversation:', err)
+        });
     }
   }
 
-  stopStream() {
-    if (this.stream) {
-      this.stream.getTracks().forEach(track => track.stop());
-      this.stream = null;
-      this.streamActive = false;
+  private scrollToBottom(): void {
+    if (this.messagesContainer) {
+      const element = this.messagesContainer.nativeElement;
+      element.scrollTop = element.scrollHeight;
     }
   }
 
-  openPermissionModal(event: MouseEvent) {
-    event.stopPropagation();
-    this.showPermission = true;
+  downloadDocument(mediaUrl: string, fileName: string): void {
+    const url = mediaUrl.startsWith('http') ? mediaUrl : 'http://localhost:8080' + mediaUrl;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
-  closePermissionModal() {
-    this.showPermission = false;
+  formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  onScroll(event: Event): void {
+    const element = event.target as HTMLElement;
+    if (element.scrollTop <= 10 && this.hasMoreMessages && !this.isLoadingMessages) {
+      this.loadMoreMessages();
+    }
+    
+    this.showStickyDate = true;
+    this.updateStickyDate(element);
+    
+    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+    this.scrollTimeout = setTimeout(() => {
+      this.showStickyDate = false;
+    }, 1000);
+  }
+
+  private updateStickyDate(element: HTMLElement): void {
+    const dateSeparators = element.querySelectorAll('.date-separator');
+    
+    for (let i = dateSeparators.length - 1; i >= 0; i--) {
+      const separator = dateSeparators[i] as HTMLElement;
+      const rect = separator.getBoundingClientRect();
+      const containerRect = element.getBoundingClientRect();
+      
+      if (rect.top <= containerRect.top + 50) {
+        const dateText = separator.querySelector('span')?.textContent || '';
+        this.stickyDate = dateText;
+        break;
+      }
+    }
+  }
+
+  private loadMoreMessages(): void {
+    if (!this.chatId || this.isLoadingMessages || !this.hasMoreMessages) return;
+    
+    this.isLoadingMessages = true;
+    const oldestMessageId = this.messages[0]?.id;
+    
+    this.conversationService.getConversationMessages(this.chatId, 20, oldestMessageId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          if (response.success && response.data.messages.length > 0) {
+            const oldScrollHeight = this.messagesContainer.nativeElement.scrollHeight;
+            const newMessages = response.data.messages.reverse();
+            this.messages = [...newMessages, ...this.messages];
+            this.hasMoreMessages = response.data.pagination.hasNext;
+            
+            setTimeout(() => {
+              const newScrollHeight = this.messagesContainer.nativeElement.scrollHeight;
+              this.messagesContainer.nativeElement.scrollTop = newScrollHeight - oldScrollHeight;
+            }, 0);
+          } else {
+            this.hasMoreMessages = false;
+          }
+          this.isLoadingMessages = false;
+        },
+        error: (err) => {
+          console.error('Error loading more messages:', err);
+          this.isLoadingMessages = false;
+        }
+      });
   }
 }

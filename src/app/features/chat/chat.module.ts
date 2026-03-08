@@ -7,8 +7,9 @@ import { ChatListComponent } from './chat-list/chat-list.component';
 import { ChatRoutingModule } from './chat-routing.module';
 import { ChatSearchComponent } from './chat-search/chat-search.component';
 import { ChatWindowComponent } from './chat-window/chat-window.component';
-
 import { NewChatComponent } from './new-chat/new-chat.component';
+import { ChatInfoComponent } from './chat-info/chat-info.component';
+import { UserProfileComponent } from './user-profile/user-profile.component';
 
 @NgModule({
     declarations: [
@@ -17,6 +18,8 @@ import { NewChatComponent } from './new-chat/new-chat.component';
         ChatWindowComponent,
         ChatSearchComponent,
         NewChatComponent,
+        ChatInfoComponent,
+        UserProfileComponent,
     ],
     imports: [
         CommonModule,

@@ -27,7 +27,11 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": []
+            "scripts": [],
+            "allowedCommonJsDependencies": [
+              "@stomp/stompjs",
+              "sockjs-client"
+            ]
           },
           "configurations": {
             "production": {
@@ -63,7 +67,8 @@
               "browserTarget": "whatsapps-frontend:build:production"
             },
             "development": {
-              "browserTarget": "whatsapps-frontend:build:development"
+              "browserTarget": "whatsapps-frontend:build:development",
+              "port": 4200
             }
           },
           "defaultConfiguration": "development"
@@ -94,5 +99,8 @@
         }
       }
     }
+  },
+  "cli": {
+    "analytics": false
   }
 }

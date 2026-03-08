@@ -1,30 +1,108 @@
-<div class="p-3 border-b bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-600 relative">
-  <div class="relative">
-    <input
-      type="text"
-      placeholder="Search or start new chat"
-      class="w-full px-4 py-2 pl-10 bg-gray-100 dark:bg-gray-700 rounded-full outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 focus:ring-2 focus:ring-green-500"
-      [(ngModel)]="searchTerm"
-      (input)="onSearch()"
-      (focus)="showContacts = true"
-      (blur)="hideContacts()"
-    />
-    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+<div class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-600">
+  <div *ngIf="showMenu" class="fixed inset-0 z-40" (mousedown)="showMenu = false"></div>
+
+  <div class="flex items-center justify-between px-4 py-3 relative z-50">
+    <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Chats</h2>
+    <div class="flex items-center gap-2">
+      <button
+        class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+        (click)="openNewChat()">
+        <i class="fas fa-comment-medical text-lg"></i>
+      </button>
+      <button
+        class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+        (click)="toggleMenu()">
+        <i class="fas fa-ellipsis-v text-lg"></i>
+      </button>
+    </div>
+
+    <!-- Menu Dropdown -->
+    <div *ngIf="showMenu"
+      class="absolute right-4 top-12 z-[60] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl w-48 py-2">
+      <button
+        class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+        (click)="openNewGroup()">
+        <i class="fas fa-users w-5"></i> New group
+      </button>
+      <button
+        class="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+        (click)="openStarredMessages()">
+        <i class="fas fa-star w-5"></i> Starred messages
+      </button>
+      <div class="border-t dark:border-gray-700 my-1"></div>
+      <button
+        class="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+        (click)="logout()">
+        <i class="fas fa-sign-out-alt w-5"></i> Logout
+      </button>
+    </div>
   </div>
-  
-  <div *ngIf="showContacts && searchTerm" class="absolute z-50 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto left-0 right-0">
-    <div class="p-2 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Contacts</div>
-    <div *ngFor="let contact of filteredContacts" 
-         class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-         (mousedown)="startChatWithContact(contact)">
-      <img [src]="contact.avatar" class="w-10 h-10 rounded-full" alt="avatar" />
-      <div>
-        <p class="font-medium text-sm text-gray-900 dark:text-gray-100">{{ contact.name }}</p>
-        <p class="text-xs text-gray-500 dark:text-gray-400">{{ contact.phone }}</p>
+
+  <!-- Search bar -->
+  <div class="px-3 pb-3 relative">
+    <div class="relative">
+      <input type="text" placeholder="Search or start new chat"
+        class="w-full px-4 py-2 pl-10 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 border border-transparent focus:border-gray-300 dark:focus:border-gray-500"
+        [(ngModel)]="searchTerm" (input)="onSearch()" (focus)="onSearchFocus()" (blur)="hideContacts()" />
+      <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
+    </div>
+
+    <div *ngIf="showContacts && searchTerm"
+      class="absolute z-50 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto left-0 right-0">
+      <div class="p-2 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Contacts</div>
+      <div *ngFor="let contact of filteredContacts"
+        class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+        (mousedown)="startChatWithContact(contact)">
+        <img [src]="contact.profilePictureUrl || 'assets/google.svg'" class="w-10 h-10 rounded-full" alt="avatar" />
+        <div>
+          <p class="font-medium text-sm text-gray-900 dark:text-gray-100">{{ contact.displayName }}</p>
+          <p class="text-xs text-gray-500 dark:text-gray-400">{{ contact.phoneNumber }}</p>
+        </div>
+      </div>
+      <div *ngIf="filteredContacts.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+        No contacts found
       </div>
     </div>
-    <div *ngIf="filteredContacts.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-      No contacts found
+  </div>
+</div>
+
+<!-- Add Contact Modal -->
+<div *ngIf="showAddContactModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+  (click)="closeAddContactModal()">
+  <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Add New Contact</h3>
+      <button (click)="closeAddContactModal()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number *</label>
+        <input type="tel" placeholder="+1234567890"
+          class="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none text-sm"
+          [(ngModel)]="newContactPhone" />
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Include country code (e.g., +1 for US)</p>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Display Name (Optional)</label>
+        <input type="text" placeholder="John Doe"
+          class="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none text-sm"
+          [(ngModel)]="newContactName" />
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button (click)="closeAddContactModal()"
+          class="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+          Cancel
+        </button>
+        <button (click)="addContact()" [disabled]="isAddingContact"
+          class="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50">
+          {{ isAddingContact ? 'Adding...' : 'Add Contact' }}
+        </button>
+      </div>
     </div>
   </div>
 </div>

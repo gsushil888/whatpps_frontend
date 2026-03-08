@@ -1,50 +1,146 @@
 <div class="bg-white dark:bg-gray-800">
-  <div
-    *ngFor="let chat of chats"
-    class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-    (click)="selectChat(chat.id)"
-    [class.bg-green-50]="chat.id === selectedChatId"
-    [class.dark:bg-green-900]="chat.id === selectedChatId"
-    [class.border-l-4]="chat.id === selectedChatId"
-    [class.border-l-green-500]="chat.id === selectedChatId"
-  >
-    <div class="relative">
-      <img
-        [src]="chat.avatar"
-        class="w-12 h-12 rounded-full object-cover"
-        alt="avatar"
-      />
-      <div
-        class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"
-      ></div>
-    </div>
+  <!-- Filters -->
+  <div class="flex gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 overflow-x-auto">
+    <button
+      *ngFor="let filter of filters"
+      (click)="selectFilter(filter)"
+      class="px-3 py-1 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
+      [class.bg-green-500]="activeFilter === filter"
+      [class.text-white]="activeFilter === filter"
+      [class.bg-gray-100]="activeFilter !== filter"
+      [class.dark:bg-gray-700]="activeFilter !== filter"
+      [class.text-gray-700]="activeFilter !== filter"
+      [class.dark:text-gray-300]="activeFilter !== filter"
+    >
+      {{ filter }}
+    </button>
+    <button
+      (click)="showContactsList()"
+      class="px-3 py-1 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
+      [class.bg-green-500]="showContacts"
+      [class.text-white]="showContacts"
+      [class.bg-gray-100]="!showContacts"
+      [class.dark:bg-gray-700]="!showContacts"
+      [class.text-gray-700]="!showContacts"
+      [class.dark:text-gray-300]="!showContacts"
+    >
+      Contacts
+    </button>
+  </div>
 
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center justify-between mb-1">
-        <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ chat.name }}</h3>
-        <span class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">{{
-          chat.time
-        }}</span>
+  <!-- Conversations List -->
+  <div *ngIf="!showContacts">
+    <div
+      *ngFor="let chat of chats"
+      class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      (click)="selectChat(chat.id)"
+      [class.bg-green-50]="chat.id === selectedChatId"
+      [class.dark:bg-green-900]="chat.id === selectedChatId"
+      [class.border-l-4]="chat.id === selectedChatId"
+      [class.border-l-green-500]="chat.id === selectedChatId"
+    >
+      <div class="relative">
+        <img
+          [src]="chat.avatar"
+          class="w-12 h-12 rounded-full object-cover"
+          alt="avatar"
+        />
+        <div
+          *ngIf="isUserOnline(chat)"
+          class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"
+        ></div>
       </div>
-      <div class="flex items-center justify-between">
-        <p class="text-sm text-gray-600 dark:text-gray-300 truncate">{{ chat.lastMessage }}</p>
-        <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-          <div
-            class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"
-          >
-            <span class="text-xs text-white font-medium">2</span>
+
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">
+            {{ chat.name }}
+          </h3>
+          <span class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
+            {{ chat.date }}
+          </span>
+        </div>
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-1 flex-1 min-w-0">
+            <i *ngIf="chat.lastMessageType === 'IMAGE'" class="fas fa-image text-gray-500 text-xs flex-shrink-0"></i>
+            <i *ngIf="chat.lastMessageType === 'VIDEO'" class="fas fa-video text-gray-500 text-xs flex-shrink-0"></i>
+            <i *ngIf="chat.lastMessageType === 'AUDIO'" class="fas fa-microphone text-gray-500 text-xs flex-shrink-0"></i>
+            <i *ngIf="chat.lastMessageType === 'DOCUMENT'" class="fas fa-file-alt text-gray-500 text-xs flex-shrink-0"></i>
+            <p class="text-sm text-gray-600 dark:text-gray-300 truncate">
+              <span *ngIf="chat.lastMessageType !== 'TEXT'" class="text-gray-500">
+                {{ getMediaTypeLabel(chat.lastMessageType || 'TEXT') }}
+              </span>
+              <span *ngIf="chat.lastMessageType === 'TEXT' || chat.lastMessage">
+                {{ chat.lastMessage }}
+              </span>
+            </p>
           </div>
+          <div class="flex items-center gap-1 flex-shrink-0 ml-2">
+            <div
+              *ngIf="chat.unreadCount > 0"
+              class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center"
+            >
+              <span class="text-xs text-white font-medium">{{ chat.unreadCount }}</span>
+            </div>
+          </div>
+        </div>
+        <!-- Online status text -->
+        <div *ngIf="chat.type === 'INDIVIDUAL' && getLastSeenText(chat)" class="mt-1">
+          <span class="text-xs text-green-500" *ngIf="isUserOnline(chat)">online</span>
+          <span class="text-xs text-gray-400" *ngIf="!isUserOnline(chat)">{{ getLastSeenText(chat) }}</span>
         </div>
       </div>
     </div>
+
+    <div
+      *ngIf="chats.length === 0"
+      class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400"
+    >
+      <i
+        class="fas fa-comments text-4xl mb-4 text-gray-300 dark:text-gray-600"
+      ></i>
+      <p class="text-lg font-medium">No chats yet</p>
+      <p class="text-sm">Search for contacts to start chatting</p>
+    </div>
   </div>
 
-  <div
-    *ngIf="chats.length === 0"
-    class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400"
-  >
-    <i class="fas fa-comments text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
-    <p class="text-lg font-medium">No chats yet</p>
-    <p class="text-sm">Search for contacts to start chatting</p>
+  <!-- Contacts List -->
+  <div *ngIf="showContacts">
+    <div
+      *ngFor="let contact of contacts"
+      class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      (click)="selectContact(contact)">
+      <div class="relative">
+        <img
+          [src]="contact.profilePictureUrl || 'assets/google.svg'"
+          class="w-12 h-12 rounded-full object-cover"
+          alt="avatar"
+        />
+        <div
+          *ngIf="contact.isOnline"
+          class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"
+        ></div>
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">
+          {{ contact.displayName }}
+        </h3>
+        <p class="text-sm text-gray-600 dark:text-gray-300 truncate">
+          {{ contact.phoneNumber }}
+        </p>
+      </div>
+    </div>
+
+    <div
+      *ngIf="contacts.length === 0"
+      class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400"
+    >
+      <i
+        class="fas fa-address-book text-4xl mb-4 text-gray-300 dark:text-gray-600"
+      ></i>
+      <p class="text-lg font-medium">No contacts yet</p>
+      <p class="text-sm">Add contacts to start chatting</p>
+    </div>
   </div>
 </div>

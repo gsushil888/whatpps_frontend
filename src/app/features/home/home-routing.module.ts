@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 import { HomeLayoutComponent } from './home-layout/home-layout.component';
+import { ProfileComponent } from './profile/profile.component';
 
 const routes: Routes = [
     {
@@ -22,6 +23,10 @@ const routes: Routes = [
             {
                 path: 'settings',
                 loadChildren: () => import('../settings/settings.module').then(m => m.SettingsModule)
+            },
+            {
+                path: 'profile',
+                component: ProfileComponent
             },
             { path: '', redirectTo: 'chat', pathMatch: 'full' }
         ]

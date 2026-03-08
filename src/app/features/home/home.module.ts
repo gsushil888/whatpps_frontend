@@ -6,11 +6,13 @@ import { SharedModule } from '../../shared/shared.module';
 import { HomeLayoutComponent } from './home-layout/home-layout.component';
 import { HomeRoutingModule } from './home-routing.module';
 import { SidebarComponent } from './sidebar/sidebar.component';
+import { ProfileComponent } from './profile/profile.component';
 
 @NgModule({
   declarations: [
     HomeLayoutComponent,
-    SidebarComponent
+    SidebarComponent,
+    ProfileComponent
   ],
   imports: [
     CommonModule,

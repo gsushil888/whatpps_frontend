@@ -1,8 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Client } from '@stomp/stompjs';
 import { Subscription } from 'rxjs';
+import { AuthService } from 'src/app/core/services/auth.service';
 import { LoaderService } from 'src/app/shared/services/loader.service';
+import { ToastService } from 'src/app/shared/services/toast.service';
 import { ViewportService } from 'src/app/shared/services/viewport.service';
 
 @Component({
@@ -21,10 +24,36 @@ export class LoginComponent implements OnInit, OnDestroy {
     private fb: FormBuilder,
     private router: Router,
     private viewport: ViewportService,
-    private loader: LoaderService
+    private loader: LoaderService,
+    private authService: AuthService,
+    private toast: ToastService
   ) { }
 
   ngOnInit(): void {
+    this.initializeForm();
+
+    if (this.authService.isAuthenticated()) {
+      this.loader.showSpinner();
+      this.authService.validateSession().subscribe({
+        next: (response) => {
+          this.loader.hideSpinner();
+          if (response.valid || response.success) {
+            this.router.navigate(['/home']);
+          } else {
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+          }
+        },
+        error: () => {
+          this.loader.hideSpinner();
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+        }
+      });
+    }
+  }
+
+  private initializeForm(): void {
     this.loginForm = this.fb.group({
       username: [''],
       password: [''],
@@ -75,18 +104,70 @@ export class LoginComponent implements OnInit, OnDestroy {
   onSubmit() {
     if (this.isUsernameFlow && this.loginForm.valid) {
       this.loader.showSpinner();
-      setTimeout(() => {
-        this.loader.hideSpinner();
-        this.router.navigate(['/auth/otp']);
-      }, 1500);
+      const payload = {
+        username: this.loginForm.value.username,
+        password: this.loginForm.value.password
+      };
+      this.authService.login(payload).subscribe({
+        next: (response) => {
+          this.loader.hideSpinner();
+          if (response.success) {
+            if (response.data.requiresOtp) {
+              this.authService.setTempSessionId(response.data.tempSessionId, response.data.expiresIn);
+              this.toast.success(response.data.message || response.message);
+              this.router.navigate(['/auth/otp']);
+            } else {
+              localStorage.setItem('accessToken', response.data.session.accessToken);
+              localStorage.setItem('refreshToken', response.data.session.refreshToken);
+              if (response.data.user?.id) {
+                localStorage.setItem('userId', response.data.user.id.toString());
+              }
+              this.toast.success(response.message);
+              this.router.navigate(['/home']);
+            }
+          }
+        },
+        error: (error) => {
+          this.loader.hideSpinner();
+          this.toast.error(error.error?.message || 'Login failed');
+        }
+      });
     } else if (this.isMobileFlow && this.loginForm.get('mobile')?.valid) {
       this.loader.showSpinner();
-      setTimeout(() => {
-        this.loader.hideSpinner();
-        this.router.navigate(['/auth/otp']);
-      }, 1500);
+      const payload = {
+        mobile: this.loginForm.value.mobile
+      };
+      this.authService.login(payload).subscribe({
+        next: (response) => {
+          this.loader.hideSpinner();
+          if (response.success) {
+            if (response.data.requiresOtp) {
+              this.authService.setTempSessionId(response.data.tempSessionId, response.data.expiresIn);
+              this.toast.success(response.data.message || response.message);
+              this.router.navigate(['/auth/otp']);
+            } else {
+              localStorage.setItem('accessToken', response.data.session.accessToken);
+              localStorage.setItem('refreshToken', response.data.session.refreshToken);
+              if (response.data.user?.id) {
+                localStorage.setItem('userId', response.data.user.id.toString());
+              }
+              this.toast.success(response.message);
+              this.router.navigate(['/home']);
+            }
+          }
+        },
+        error: (error) => {
+          this.loader.hideSpinner();
+          this.toast.error(error.error?.message || 'Login failed');
+        }
+      });
     }
   }
+
+  // =======
+
+
+  private stompClient!: Client;
 
   loginWithGoogle() {
     this.router.navigate(['/home']);
@@ -94,5 +175,11 @@ export class LoginComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.sub) this.sub.unsubscribe();
+    if (this.stompClient) {
+      this.stompClient.deactivate();
+    }
   }
+
+
+
 }

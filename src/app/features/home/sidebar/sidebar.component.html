@@ -49,13 +49,25 @@
       </span>
     </button>
     
-    <div class="relative group p-3 rounded-lg transition-colors">
-      <img src="assets/google.svg" class="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600" alt="me" />
+    <div class="relative group p-3 rounded-lg transition-colors cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700" (click)="openProfile()">
+      <img [src]="currentUser?.profilePictureUrl || 'assets/google.svg'" class="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 object-cover" alt="me" />
       <span
         class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-800 dark:bg-gray-600 text-white text-xs px-2 py-1 rounded hidden group-hover:block z-10"
       >
         Profile
       </span>
     </div>
+
+    <button
+      class="relative group p-3 rounded-lg transition-colors text-xl text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
+      (click)="logout()"
+    >
+      <i class="fas fa-sign-out-alt"></i>
+      <span
+        class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-800 dark:bg-gray-600 text-white text-xs px-2 py-1 rounded hidden group-hover:block z-10"
+      >
+        Logout
+      </span>
+    </button>
   </div>
 </aside>

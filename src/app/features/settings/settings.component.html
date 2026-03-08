@@ -1,0 +1,184 @@
+<div class="flex h-full bg-white dark:bg-gray-800">
+  <!-- Settings List -->
+  <div class="w-[400px] border-r border-gray-200 dark:border-gray-700 flex flex-col">
+    <!-- Header -->
+    <div class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center px-6">
+      <h1 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Settings</h1>
+    </div>
+
+    <!-- Profile Section -->
+    <div class="p-4 border-b border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+      <div class="flex items-center gap-3">
+        <img 
+          [src]="currentUser?.profilePictureUrl || 'assets/google.svg'" 
+          class="w-16 h-16 rounded-full object-cover" 
+          alt="profile" 
+        />
+        <div class="flex-1">
+          <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ currentUser?.displayName }}</h3>
+          <p class="text-sm text-gray-600 dark:text-gray-400">{{ currentUser?.about || 'Hey there! I am using WhatsApp.' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings Options -->
+    <div class="flex-1 overflow-y-auto">
+      <button
+        *ngFor="let item of settingsItems"
+        class="w-full px-6 py-4 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-100 dark:border-gray-700"
+        [class.bg-green-50]="selectedSetting === item.id"
+        [class.dark:bg-green-900]="selectedSetting === item.id"
+        (click)="selectSetting(item.id)"
+      >
+        <i [class]="item.icon + ' text-gray-600 dark:text-gray-400 text-xl'"></i>
+        <span class="text-gray-900 dark:text-gray-100">{{ item.label }}</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Settings Detail -->
+  <div class="flex-1 overflow-y-auto">
+    <!-- Account Settings -->
+    <div *ngIf="selectedSetting === 'account'" class="p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Account</h2>
+      
+      <div class="space-y-4">
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+          <label class="text-sm text-gray-500 dark:text-gray-400">Phone Number</label>
+          <p class="text-base text-gray-900 dark:text-gray-100 mt-1">{{ currentUser?.phoneNumber }}</p>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+          <label class="text-sm text-gray-500 dark:text-gray-400">Email</label>
+          <p class="text-base text-gray-900 dark:text-gray-100 mt-1">{{ currentUser?.email }}</p>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+          <label class="text-sm text-gray-500 dark:text-gray-400">Username</label>
+          <p class="text-base text-gray-900 dark:text-gray-100 mt-1">@{{ currentUser?.username }}</p>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+          <label class="text-sm text-gray-500 dark:text-gray-400">Account Type</label>
+          <p class="text-base text-gray-900 dark:text-gray-100 mt-1">{{ currentUser?.accountType }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Privacy Settings -->
+    <div *ngIf="selectedSetting === 'privacy'" class="p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Privacy</h2>
+      
+      <div class="space-y-4">
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <div>
+            <h3 class="font-medium text-gray-900 dark:text-gray-100">Last Seen</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">{{ currentUser?.privacySettings?.lastSeenVisibility }}</p>
+          </div>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <div>
+            <h3 class="font-medium text-gray-900 dark:text-gray-100">Profile Photo</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">{{ currentUser?.privacySettings?.profilePhotoVisibility }}</p>
+          </div>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <div>
+            <h3 class="font-medium text-gray-900 dark:text-gray-100">Status</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">{{ currentUser?.privacySettings?.statusVisibility }}</p>
+          </div>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <div>
+            <h3 class="font-medium text-gray-900 dark:text-gray-100">Read Receipts</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">{{ currentUser?.privacySettings?.readReceiptsEnabled ? 'Enabled' : 'Disabled' }}</p>
+          </div>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <div>
+            <h3 class="font-medium text-gray-900 dark:text-gray-100">Groups</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">{{ currentUser?.privacySettings?.groupsVisibility }}</p>
+          </div>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications Settings -->
+    <div *ngIf="selectedSetting === 'notifications'" class="p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Notifications</h2>
+      
+      <div class="space-y-4">
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <span class="text-gray-900 dark:text-gray-100">Message notifications</span>
+          <input type="checkbox" checked class="w-5 h-5 rounded" />
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <span class="text-gray-900 dark:text-gray-100">Call notifications</span>
+          <input type="checkbox" checked class="w-5 h-5 rounded" />
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <span class="text-gray-900 dark:text-gray-100">Show previews</span>
+          <input type="checkbox" checked class="w-5 h-5 rounded" />
+        </div>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <span class="text-gray-900 dark:text-gray-100">Sound</span>
+          <input type="checkbox" checked class="w-5 h-5 rounded" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Appearance Settings -->
+    <div *ngIf="selectedSetting === 'appearance'" class="p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Appearance</h2>
+      
+      <div class="space-y-4">
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center">
+          <div>
+            <h3 class="font-medium text-gray-900 dark:text-gray-100">Theme</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Choose your preferred theme</p>
+          </div>
+          <app-theme-toggle></app-theme-toggle>
+        </div>
+      </div>
+    </div>
+
+    <!-- Help Settings -->
+    <div *ngIf="selectedSetting === 'help'" class="p-6">
+      <h2 class="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-6">Help</h2>
+      
+      <div class="space-y-4">
+        <button class="w-full bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-600">
+          <span class="text-gray-900 dark:text-gray-100">Help Center</span>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </button>
+
+        <button class="w-full bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-600">
+          <span class="text-gray-900 dark:text-gray-100">Contact Us</span>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </button>
+
+        <button class="w-full bg-gray-50 dark:bg-gray-700 p-4 rounded-lg flex justify-between items-center hover:bg-gray-100 dark:hover:bg-gray-600">
+          <span class="text-gray-900 dark:text-gray-100">Terms and Privacy Policy</span>
+          <i class="fas fa-chevron-right text-gray-400"></i>
+        </button>
+
+        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+          <p class="text-sm text-gray-600 dark:text-gray-400">App Version</p>
+          <p class="text-base text-gray-900 dark:text-gray-100 mt-1">2.26.0</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

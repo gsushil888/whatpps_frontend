@@ -1,0 +1,59 @@
+<div class="h-full bg-white dark:bg-gray-800 overflow-y-auto">
+  <!-- Header -->
+  <div class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center px-4">
+    <button
+      (click)="onClose()"
+      class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors mr-3"
+    >
+      <i class="fas fa-arrow-left text-gray-700 dark:text-gray-300"></i>
+    </button>
+    <h2 class="text-lg font-semibold text-gray-800 dark:text-gray-200">Profile</h2>
+  </div>
+
+  <!-- Profile Content -->
+  <div class="flex flex-col items-center pt-8 pb-6">
+    <img
+      [src]="currentUser?.profilePictureUrl || 'assets/google.svg'"
+      class="w-40 h-40 rounded-full object-cover shadow-lg"
+      alt="profile"
+    />
+  </div>
+
+  <!-- Profile Details -->
+  <div class="px-6 space-y-6">
+    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg">
+      <label class="text-xs text-gray-500 dark:text-gray-400">Name</label>
+      <p class="text-lg font-semibold text-gray-900 dark:text-gray-100 mt-1">{{ currentUser?.displayName }}</p>
+    </div>
+
+    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg">
+      <label class="text-xs text-gray-500 dark:text-gray-400">About</label>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">{{ currentUser?.about || 'Hey there! I am using WhatsApp.' }}</p>
+    </div>
+
+    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg">
+      <label class="text-xs text-gray-500 dark:text-gray-400">Phone</label>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">{{ currentUser?.phoneNumber }}</p>
+    </div>
+
+    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg">
+      <label class="text-xs text-gray-500 dark:text-gray-400">Email</label>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">{{ currentUser?.email }}</p>
+    </div>
+
+    <div class="bg-white dark:bg-gray-700 p-4 rounded-lg">
+      <label class="text-xs text-gray-500 dark:text-gray-400">Username</label>
+      <p class="text-sm text-gray-700 dark:text-gray-300 mt-1">@{{ currentUser?.username }}</p>
+    </div>
+  </div>
+
+  <!-- Settings Button -->
+  <div class="p-6 mt-6">
+    <button
+      class="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+    >
+      <i class="fas fa-cog"></i>
+      <span>Settings</span>
+    </button>
+  </div>
+</div>

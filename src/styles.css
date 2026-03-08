@@ -15,6 +15,32 @@
     @apply bg-gray-400 rounded;
 }
 
+/* WhatsApp-style scrollbar */
+.whatsapp-scrollbar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.whatsapp-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.whatsapp-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.whatsapp-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.dark .whatsapp-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+.dark .whatsapp-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(255, 255, 255, 0.24);
+}
+
 /* Theme variables using Tailwind classes */
 :root {
     /* Light Theme (WhatsApp Gradient) */

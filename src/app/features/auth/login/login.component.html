@@ -48,9 +48,9 @@
           Password is required (min 6 characters)
         </div>
       </div>
-      <!-- OR Separator (Desktop only, when not in username flow) -->
+      <!-- OR Separator (Desktop only, when not in username flow and not in mobile flow) -->
       <div
-        *ngIf="!isMobileView && !isUsernameFlow"
+        *ngIf="!isMobileView && !isUsernameFlow && !isMobileFlow"
         class="flex items-center my-4"
       >
         <hr class="flex-1 border-gray-300" />

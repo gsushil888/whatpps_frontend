@@ -1,0 +1,45 @@
+<div class="h-full bg-white dark:bg-gray-800 overflow-y-auto">
+  <div class="max-w-2xl mx-auto">
+    <!-- Header -->
+    <div class="h-16 border-b border-gray-200 dark:border-gray-700 flex items-center px-6">
+      <h2 class="text-xl font-semibold text-gray-800 dark:text-gray-200">Profile</h2>
+    </div>
+
+    <!-- Profile Content -->
+    <div class="flex flex-col items-center pt-12 pb-8">
+      <img
+        [src]="currentUser?.profilePictureUrl || 'assets/google.svg'"
+        class="w-40 h-40 rounded-full object-cover shadow-lg"
+        alt="profile"
+      />
+    </div>
+
+    <!-- Profile Details -->
+    <div class="px-8 space-y-6 pb-8">
+      <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+        <label class="text-sm text-gray-500 dark:text-gray-400 font-medium">Name</label>
+        <p class="text-xl font-semibold text-gray-900 dark:text-gray-100 mt-2">{{ currentUser?.displayName }}</p>
+      </div>
+
+      <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+        <label class="text-sm text-gray-500 dark:text-gray-400 font-medium">About</label>
+        <p class="text-base text-gray-700 dark:text-gray-300 mt-2">{{ currentUser?.about || 'Hey there! I am using WhatsApp.' }}</p>
+      </div>
+
+      <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+        <label class="text-sm text-gray-500 dark:text-gray-400 font-medium">Phone</label>
+        <p class="text-base text-gray-700 dark:text-gray-300 mt-2">{{ currentUser?.phoneNumber }}</p>
+      </div>
+
+      <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+        <label class="text-sm text-gray-500 dark:text-gray-400 font-medium">Email</label>
+        <p class="text-base text-gray-700 dark:text-gray-300 mt-2">{{ currentUser?.email }}</p>
+      </div>
+
+      <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-lg">
+        <label class="text-sm text-gray-500 dark:text-gray-400 font-medium">Username</label>
+        <p class="text-base text-gray-700 dark:text-gray-300 mt-2">@{{ currentUser?.username }}</p>
+      </div>
+    </div>
+  </div>
+</div>

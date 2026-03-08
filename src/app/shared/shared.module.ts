@@ -6,6 +6,7 @@ import { LoaderComponent } from './components/loader/loader.component';
 import { SkeletonLoaderComponent } from './components/skeleton-loader/skeleton-loader.component';
 import { ProblemPageComponent } from './components/problem-page/problem-page.component';
 import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.component';
+import { ToastComponent } from './components/toast/toast.component';
 
 @NgModule({
     declarations: [
@@ -13,6 +14,7 @@ import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.com
         LoaderComponent,
         ProblemPageComponent,
         ThemeToggleComponent,
+        ToastComponent,
     ],
     imports: [
         CommonModule,
@@ -21,7 +23,8 @@ import { ThemeToggleComponent } from './components/theme-toggle/theme-toggle.com
     exports: [
         SkeletonLoaderComponent,
         LoaderComponent,
-        ThemeToggleComponent
+        ThemeToggleComponent,
+        ToastComponent
     ]
 })
 export class SharedModule { }

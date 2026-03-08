@@ -20,7 +20,6 @@ export class ViewportService {
         return window.innerWidth <= 768;
     }
 
-    /** Observable to subscribe */
     get isMobileView$() {
         return this.mobileView$.asObservable();
     }
