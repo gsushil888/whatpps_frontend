@@ -51,3 +51,39 @@
 .animate-slide-left {
     animation: slide-left 0.3s ease-out;
 }
+
+/* WhatsApp Typing Indicator */
+.typing-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background-color: #54656f;
+    display: inline-block;
+    animation: typing-wave 1.3s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.typing-dot:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.typing-dot:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes typing-wave {
+    0%, 60%, 100% {
+        transform: translateY(0);
+    }
+    30% {
+        transform: translateY(-12px);
+    }
+}
+
+/* Dark mode */
+:host-context(.dark) .typing-dot {
+    background-color: #aebac1;
+}

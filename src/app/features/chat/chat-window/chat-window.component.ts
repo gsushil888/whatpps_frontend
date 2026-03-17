@@ -3,6 +3,7 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TokenService } from 'src/app/core/services/token.service';
 import { PresenceService } from 'src/app/core/services/presence.service';
+import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
 import { Chat, ChatService } from '../services/chat.service';
 import { ConversationMessage, ConversationService } from '../services/conversation.service';
 import { WebSocketService } from '../services/websocket.service';
@@ -34,6 +35,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   showStickyDate = false;
   private scrollTimeout: any;
   private destroy$ = new Subject<void>();
+  isTyping = false;
+  typingText = '';
+  private isAutoScrolling = false;
 
   @ViewChild('video') videoElement!: ElementRef<HTMLVideoElement>;
   @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
@@ -43,7 +47,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     private conversationService: ConversationService,
     private tokenService: TokenService,
     private webSocketService: WebSocketService,
-    private presenceService: PresenceService
+    private presenceService: PresenceService,
+    private typingIndicatorService: TypingIndicatorService
   ) { }
 
   ngOnInit(): void {
@@ -72,6 +77,19 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
           this.addMessageToList(message);
         }
       });
+
+    // Subscribe to typing indicators
+    this.typingIndicatorService.typingUsers$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.chatId) {
+          this.isTyping = this.typingIndicatorService.isAnyoneTyping(parseInt(this.chatId));
+          this.typingText = this.typingIndicatorService.getTypingText(parseInt(this.chatId));
+          if (this.isTyping) {
+            setTimeout(() => this.scrollToBottom(), 100);
+          }
+        }
+      });
   }
 
   ngOnDestroy(): void {
@@ -95,6 +113,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       const conversationId = parseInt(this.chatId);
       console.log('🔔 Subscribing to conversation:', conversationId);
       this.webSocketService.subscribeToConversation(conversationId);
+      this.typingIndicatorService.subscribeToConversation(conversationId);
     }
   }
 
@@ -204,6 +223,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     }
   }
 
+  onTyping() {
+    if (this.chatId) {
+      this.typingIndicatorService.startTyping(parseInt(this.chatId));
+    }
+  }
+
   sendMessage() {
     if (this.newMessage.trim() && this.chatId) {
       const conversationId = parseInt(this.chatId);
@@ -215,6 +240,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       console.log('📤 Sending message to conversation:', conversationId);
       console.log('📝 Message content:', message);
 
+      this.typingIndicatorService.stopTyping(conversationId);
       this.webSocketService.sendMessage(conversationId, message);
       this.newMessage = '';
     } else {
@@ -492,8 +518,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   private scrollToBottom(): void {
     if (this.messagesContainer) {
+      this.isAutoScrolling = true;
       const element = this.messagesContainer.nativeElement;
       element.scrollTop = element.scrollHeight;
+      setTimeout(() => {
+        this.isAutoScrolling = false;
+      }, 100);
     }
   }
 

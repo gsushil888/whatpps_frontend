@@ -3,6 +3,7 @@ import { Client, IMessage } from '@stomp/stompjs';
 import { BehaviorSubject } from 'rxjs';
 import * as SockJS from 'sockjs-client';
 import { PresenceService } from 'src/app/core/services/presence.service';
+import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
 import { TokenService } from 'src/app/core/services/token.service';
 import { environment } from 'src/environments/environment';
 
@@ -23,7 +24,11 @@ export class WebSocketService {
 
   message$ = this.messageSubject.asObservable();
 
-  constructor(private tokenService: TokenService, private presenceService: PresenceService) { }
+  constructor(
+    private tokenService: TokenService,
+    private presenceService: PresenceService,
+    private typingIndicatorService: TypingIndicatorService
+  ) { }
 
   connect(): void {
     const token = this.tokenService.getAccessToken();
@@ -43,6 +48,7 @@ export class WebSocketService {
         this.messageSubject.next(JSON.parse(message.body));
       });
       this.presenceService.initialize(this.stompClient!);
+      this.typingIndicatorService.initialize(this.stompClient!, parseInt(userId));
     };
 
     this.stompClient.activate();

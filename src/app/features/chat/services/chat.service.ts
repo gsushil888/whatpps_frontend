@@ -34,7 +34,7 @@ export class ChatService {
   private showNewChatViewSubject = new BehaviorSubject<boolean>(false);
   showNewChatView$ = this.showNewChatViewSubject.asObservable();
 
-  constructor(private conversationService: ConversationService, private tokenService: TokenService) {}
+  constructor(private conversationService: ConversationService, private tokenService: TokenService) { }
 
   initializeConversations() {
     this.loadConversations();
@@ -52,7 +52,7 @@ export class ChatService {
         if (response.success) {
           const chats = response.data.conversations.map(conv => this.mapConversationToChat(conv));
           this.chatsSubject.next(chats);
-          
+
           // Lazy load otherUserId for chats that don't have it
           chats.forEach(chat => {
             if (chat.type === 'INDIVIDUAL' && !chat.otherUserId) {
@@ -74,7 +74,7 @@ export class ChatService {
   private mapConversationToChat(conversation: Conversation): Chat {
     const timestamp = conversation.lastMessage?.timestamp || conversation.lastMessageAt;
     const currentUserId = parseInt(this.tokenService.getUserId() || '0');
-    
+
     // For individual chats, get the other user's ID
     let otherUserId: number | undefined;
     if (conversation.type === 'INDIVIDUAL') {
@@ -92,13 +92,13 @@ export class ChatService {
         otherUserId = undefined;
       }
     }
-    
+
     return {
       id: conversation.id.toString(),
       name: conversation.title,
       avatar: conversation.profileImageUrl || 'assets/google.svg',
-      date: this.formatDate(timestamp),
-      time: this.formatTime(timestamp),
+      date: timestamp ? this.formatDate(timestamp) : '',
+      time: timestamp ? this.formatTime(timestamp) : '',
       lastMessage: conversation.lastMessage?.content || '',
       lastMessageType: conversation.lastMessage?.type || 'TEXT',
       unreadCount: conversation.unreadCount || 0,
@@ -176,10 +176,10 @@ export class ChatService {
         if (response.success) {
           const currentUserId = parseInt(this.tokenService.getUserId() || '0');
           const otherUser = response.data.participants.find(p => p.userId !== currentUserId);
-          
+
           if (otherUser) {
             const currentChats = this.chatsSubject.value;
-            const updatedChats = currentChats.map(chat => 
+            const updatedChats = currentChats.map(chat =>
               chat.id === conversationId ? { ...chat, otherUserId: otherUser.userId } : chat
             );
             this.chatsSubject.next(updatedChats);

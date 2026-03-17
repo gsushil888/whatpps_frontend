@@ -193,10 +193,12 @@ export class ConversationService {
     return this.http.get<ConversationDetailResponse>(url, { headers: this.tokenService.getAuthHeaders() });
   }
 
-  uploadMedia(conversationId: string, file: File): Observable<any> {
+  uploadMedia(conversationId: string | null, file: File): Observable<any> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('conversationId', conversationId);
+    if (conversationId) {
+      formData.append('conversationId', conversationId);
+    }
     const url = `${environment.apiBaseUrl}media/upload`;
     return this.http.post(url, formData, { headers: this.tokenService.getAuthHeaders() });
   }
