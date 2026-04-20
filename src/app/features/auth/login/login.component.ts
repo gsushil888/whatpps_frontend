@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { Client } from '@stomp/stompjs';
 import { Subscription } from 'rxjs';
 import { AuthService } from 'src/app/core/services/auth.service';
+import { TokenService } from 'src/app/core/services/token.service';
 import { LoaderService } from 'src/app/shared/services/loader.service';
 import { ToastService } from 'src/app/shared/services/toast.service';
 import { ViewportService } from 'src/app/shared/services/viewport.service';
@@ -26,6 +27,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     private viewport: ViewportService,
     private loader: LoaderService,
     private authService: AuthService,
+    private tokenService: TokenService,
     private toast: ToastService
   ) { }
 
@@ -40,14 +42,12 @@ export class LoginComponent implements OnInit, OnDestroy {
           if (response.valid || response.success) {
             this.router.navigate(['/home']);
           } else {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
+            this.tokenService.clearTokens();
           }
         },
         error: () => {
           this.loader.hideSpinner();
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+          this.tokenService.clearTokens();
         }
       });
     }
@@ -117,8 +117,8 @@ export class LoginComponent implements OnInit, OnDestroy {
               this.toast.success(response.data.message || response.message);
               this.router.navigate(['/auth/otp']);
             } else {
-              localStorage.setItem('accessToken', response.data.session.accessToken);
-              localStorage.setItem('refreshToken', response.data.session.refreshToken);
+              this.tokenService.setAccessToken(response.data.session.accessToken);
+              this.tokenService.setRefreshToken(response.data.session.refreshToken);
               if (response.data.user?.id) {
                 localStorage.setItem('userId', response.data.user.id.toString());
               }
@@ -146,8 +146,8 @@ export class LoginComponent implements OnInit, OnDestroy {
               this.toast.success(response.data.message || response.message);
               this.router.navigate(['/auth/otp']);
             } else {
-              localStorage.setItem('accessToken', response.data.session.accessToken);
-              localStorage.setItem('refreshToken', response.data.session.refreshToken);
+              this.tokenService.setAccessToken(response.data.session.accessToken);
+              this.tokenService.setRefreshToken(response.data.session.refreshToken);
               if (response.data.user?.id) {
                 localStorage.setItem('userId', response.data.user.id.toString());
               }

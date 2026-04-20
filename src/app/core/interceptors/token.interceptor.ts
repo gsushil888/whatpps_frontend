@@ -4,13 +4,14 @@ import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, throwError } from 'rxjs';
 import { catchError, filter, switchMap, take } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
+import { TokenService } from '../services/token.service';
 
 @Injectable()
 export class TokenInterceptor implements HttpInterceptor {
   private isRefreshing = false;
   private refreshTokenSubject: BehaviorSubject<any> = new BehaviorSubject<any>(null);
 
-  constructor(private authService: AuthService, private router: Router) { }
+  constructor(private authService: AuthService, private tokenService: TokenService, private router: Router) { }
 
   intercept(request: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(request).pipe(
@@ -32,8 +33,8 @@ export class TokenInterceptor implements HttpInterceptor {
         switchMap((response: any) => {
           this.isRefreshing = false;
           if (response.success) {
-            localStorage.setItem('accessToken', response.data.accessToken);
-            localStorage.setItem('refreshToken', response.data.refreshToken);
+            this.tokenService.setAccessToken(response.data.accessToken);
+            this.tokenService.setRefreshToken(response.data.refreshToken);
             this.refreshTokenSubject.next(response.data.accessToken);
             return next.handle(this.addToken(request, response.data.accessToken));
           }
@@ -42,7 +43,7 @@ export class TokenInterceptor implements HttpInterceptor {
         }),
         catchError((err) => {
           this.isRefreshing = false;
-          localStorage.clear();
+          this.tokenService.clearTokens();
           this.router.navigate(['/auth/login']);
           return throwError(() => err);
         })

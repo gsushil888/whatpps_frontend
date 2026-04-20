@@ -1,19 +1,26 @@
-import { Injectable } from '@angular/core';
 import { HttpHeaders } from '@angular/common/http';
+import { Injectable } from '@angular/core';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TokenService {
-  private readonly ACCESS_TOKEN_KEY = 'accessToken';
   private readonly REFRESH_TOKEN_KEY = 'refreshToken';
+  private readonly ACCESS_TOKEN_KEY = 'accessToken';
+  private accessToken: string | null = null;
 
   getAccessToken(): string | null {
-    return localStorage.getItem(this.ACCESS_TOKEN_KEY);
+    return this.accessToken;
   }
 
   setAccessToken(token: string): void {
+    this.accessToken = token;
     localStorage.setItem(this.ACCESS_TOKEN_KEY, token);
+  }
+
+  loadFromStorage(): void {
+    const token = localStorage.getItem(this.ACCESS_TOKEN_KEY);
+    if (token) this.accessToken = token;
   }
 
   getRefreshToken(): string | null {
@@ -27,7 +34,7 @@ export class TokenService {
   getUserId(): string | null {
     const token = this.getAccessToken();
     if (!token) return null;
-    
+
     try {
       const payload = this.decodeToken(token);
       return payload?.sub || null;
@@ -54,6 +61,7 @@ export class TokenService {
   }
 
   clearTokens(): void {
+    this.accessToken = null;
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
   }
@@ -73,7 +81,7 @@ export class TokenService {
       const payload = this.decodeToken(token);
       const exp = payload?.exp;
       if (!exp) return true;
-      
+
       return Date.now() >= exp * 1000;
     } catch (error) {
       return true;

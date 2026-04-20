@@ -16,6 +16,10 @@ export class AuthService {
     private tokenService: TokenService
   ) { }
 
+  register(formData: FormData): Observable<any> {
+    return this.http.post(`${this.API_URL}/register`, formData);
+  }
+
   login(payload: { username?: string; password?: string; mobile?: string; email?: string }): Observable<any> {
     const token = this.tokenService.getAccessToken();
     const headers = new HttpHeaders({
