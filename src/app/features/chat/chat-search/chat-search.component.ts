@@ -26,9 +26,7 @@ export class ChatSearchComponent implements OnInit {
     private tokenService: TokenService
   ) { }
 
-  ngOnInit(): void {
-    this.loadContacts();
-  }
+  ngOnInit(): void { }
 
   loadContacts(): void {
     this.contactService.getContacts().subscribe({
@@ -68,6 +66,9 @@ export class ChatSearchComponent implements OnInit {
   onSearchFocus() {
     this.showMenu = false;
     this.showContacts = true;
+    if (this.contacts.length === 0) {
+      this.loadContacts();
+    }
   }
 
   hideContacts() {

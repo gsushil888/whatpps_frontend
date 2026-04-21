@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TokenService } from 'src/app/core/services/token.service';
@@ -48,7 +48,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     private tokenService: TokenService,
     private webSocketService: WebSocketService,
     private presenceService: PresenceService,
-    private typingIndicatorService: TypingIndicatorService
+    private typingIndicatorService: TypingIndicatorService,
+    private cdr: ChangeDetectorRef
   ) { }
 
   ngOnInit(): void {
@@ -77,6 +78,10 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
           this.addMessageToList(message);
         }
       });
+
+    this.presenceService.presence$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.cdr.markForCheck());
 
     // Subscribe to typing indicators
     this.typingIndicatorService.typingUsers$
@@ -154,24 +159,29 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   getChatOnlineStatus(): string {
     if (!this.currentChat || this.currentChat.type === 'GROUP') return '';
-    if (this.currentChat.isOnline) return 'online';
-    if (!this.currentChat.lastActiveAt) return '';
-    
+    if (this.currentChat.otherUserId) {
+      return this.presenceService.getLastSeen(this.currentChat.otherUserId) ||
+        (this.currentChat.isOnline ? 'online' : this.getStaticLastSeen());
+    }
+    return this.currentChat.isOnline ? 'online' : this.getStaticLastSeen();
+  }
+
+  isCurrentChatOnline(): boolean {
+    if (this.currentChat?.otherUserId) {
+      return this.presenceService.isUserOnline(this.currentChat.otherUserId);
+    }
+    return this.currentChat?.isOnline === true;
+  }
+
+  private getStaticLastSeen(): string {
+    if (!this.currentChat?.lastActiveAt) return '';
     const lastActive = new Date(this.currentChat.lastActiveAt);
     if (isNaN(lastActive.getTime())) return '';
-    
-    const now = new Date();
-    const diffMs = now.getTime() - lastActive.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    
+    const diffMins = Math.floor((Date.now() - lastActive.getTime()) / 60000);
     if (diffMins < 1) return 'last seen just now';
     if (diffMins < 60) return `last seen ${diffMins} minutes ago`;
     if (diffMins < 1440) return `last seen ${Math.floor(diffMins / 60)} hours ago`;
     return `last seen ${Math.floor(diffMins / 1440)} days ago`;
-  }
-
-  isCurrentChatOnline(): boolean {
-    return this.currentChat?.isOnline === true;
   }
 
   isCurrentUser(senderId: number): boolean {
