@@ -52,13 +52,6 @@ export class ChatService {
         if (response.success) {
           const chats = response.data.conversations.map(conv => this.mapConversationToChat(conv));
           this.chatsSubject.next(chats);
-
-          // Lazy load otherUserId for chats that don't have it
-          chats.forEach(chat => {
-            if (chat.type === 'INDIVIDUAL' && !chat.otherUserId) {
-              this.loadOtherUserId(chat.id);
-            }
-          });
         }
       },
       error: (err) => console.error('Error loading conversations:', err)
@@ -170,23 +163,4 @@ export class ChatService {
     this.chatsSubject.next(updatedChats);
   }
 
-  private loadOtherUserId(conversationId: string) {
-    this.conversationService.getConversationDetail(conversationId).subscribe({
-      next: (response) => {
-        if (response.success) {
-          const currentUserId = parseInt(this.tokenService.getUserId() || '0');
-          const otherUser = response.data.participants.find(p => p.userId !== currentUserId);
-
-          if (otherUser) {
-            const currentChats = this.chatsSubject.value;
-            const updatedChats = currentChats.map(chat =>
-              chat.id === conversationId ? { ...chat, otherUserId: otherUser.userId } : chat
-            );
-            this.chatsSubject.next(updatedChats);
-          }
-        }
-      },
-      error: (err) => console.error(`Error loading otherUserId for conversation ${conversationId}:`, err)
-    });
-  }
 }
