@@ -16,6 +16,7 @@ export interface Chat {
   isOnline?: boolean | null;
   lastActiveAt?: string | null;
   otherUserId?: number;
+  lastMessageAt?: string | null;
 }
 
 @Injectable({
@@ -45,13 +46,21 @@ export class ChatService {
     this.selectedChatIdSubject.next(null);
   }
 
+  private sortByLatest(chats: Chat[]): Chat[] {
+    return [...chats].sort((a, b) => {
+      const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+      const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      return tb - ta;
+    });
+  }
+
   private loadConversations(filter?: string) {
     this.conversationService.getConversations(20, 0, filter).subscribe({
       next: (response) => {
         console.log('Conversations loaded:', response);
         if (response.success) {
           const chats = response.data.conversations.map(conv => this.mapConversationToChat(conv));
-          this.chatsSubject.next(chats);
+          this.chatsSubject.next(this.sortByLatest(chats));
         }
       },
       error: (err) => console.error('Error loading conversations:', err)
@@ -98,7 +107,8 @@ export class ChatService {
       type: conversation.type,
       isOnline: conversation.isOnline,
       lastActiveAt: conversation.lastActiveAt,
-      otherUserId: otherUserId
+      otherUserId: otherUserId,
+      lastMessageAt: conversation.lastMessage?.timestamp || conversation.lastMessageAt || null
     };
   }
 
@@ -134,7 +144,7 @@ export class ChatService {
     const currentChats = this.chatsSubject.value;
     const existingChat = currentChats.find(c => c.id === chat.id);
     if (!existingChat) {
-      this.chatsSubject.next([chat, ...currentChats]);
+      this.chatsSubject.next(this.sortByLatest([chat, ...currentChats]));
     }
   }
 
@@ -155,6 +165,15 @@ export class ChatService {
 
   findChatById(conversationId: number): Chat | undefined {
     return this.chatsSubject.value.find(chat => chat.id === conversationId.toString());
+  }
+
+  updateChatLastMessage(chatId: string, lastMessage: string, lastMessageType: string, timestamp: string) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId
+        ? { ...c, lastMessage, lastMessageType, lastMessageAt: timestamp, date: this.formatDate(timestamp), time: this.formatTime(timestamp) }
+        : c
+    );
+    this.chatsSubject.next(this.sortByLatest(chats));
   }
 
   removeChat(chatId: string) {
