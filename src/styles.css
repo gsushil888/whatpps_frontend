@@ -2,6 +2,26 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body, app-root {
+  height: 100%;
+  margin: 0;
+}
+
+/* Make all routed components fill their container */
+app-home-layout {
+  display: block;
+  height: 100%;
+}
+
+app-chat-layout,
+app-call-layout,
+app-status-layout,
+app-settings {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
 /* styles.css */
 @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css');
 

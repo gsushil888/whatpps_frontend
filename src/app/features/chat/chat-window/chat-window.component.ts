@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TokenService } from 'src/app/core/services/token.service';
@@ -13,6 +13,8 @@ import { WebSocketService } from '../services/websocket.service';
   templateUrl: './chat-window.component.html'
 })
 export class ChatWindowComponent implements OnInit, OnDestroy {
+  @Input() isMobile = false;
+  @Output() backToList = new EventEmitter<void>();
   chatId: string | null = null;
   currentChat: Chat | null = null;
   conversationType: string = 'INDIVIDUAL';
@@ -300,6 +302,16 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     this.messages.push(newMessage);
     console.log('✅ Message added. Total messages:', this.messages.length);
     console.log('Full message object:', newMessage);
+
+    if (this.chatId && newMessage.createdAt) {
+      this.chatService.updateChatLastMessage(
+        this.chatId,
+        newMessage.content || '',
+        newMessage.messageType,
+        newMessage.createdAt
+      );
+    }
+
     setTimeout(() => this.scrollToBottom(), 100);
   }
 
