@@ -64,13 +64,18 @@
           </div>
 
           <!-- Message -->
-          <div class="flex" [class.justify-end]="isCurrentUser(msg.senderId)"
-            [class.justify-start]="!isCurrentUser(msg.senderId)">
+          <div class="flex mb-1"
+            [class.justify-end]="isCurrentUser(msg.senderId)"
+            [class.justify-start]="!isCurrentUser(msg.senderId)"
+            (mouseenter)="hoveredMsgId = msg.id"
+            (mouseleave)="hoveredMsgId = null">
             <div class="flex gap-1 max-w-[80%] min-w-0" [class.flex-row-reverse]="isCurrentUser(msg.senderId)">
               <img *ngIf="isGroupChat() && !isCurrentUser(msg.senderId)" [src]="msg.senderAvatar"
                 class="w-6 h-6 rounded-full object-cover flex-shrink-0 self-start mt-0.5" [alt]="msg.senderName" />
-              <div class="relative pb-2">
-                <div class="px-2 py-2 rounded-md shadow-sm" [class.bg-white]="!isCurrentUser(msg.senderId)"
+              <div>
+                <!-- Bubble -->
+                <div class="px-2 py-2 rounded-md shadow-sm"
+                  [class.bg-white]="!isCurrentUser(msg.senderId)"
                   [class.dark:bg-gray-700]="!isCurrentUser(msg.senderId)"
                   [class.bg-green-500]="isCurrentUser(msg.senderId)"
                   [class.dark:bg-green-600]="isCurrentUser(msg.senderId)"
@@ -174,11 +179,39 @@
                     {{ formatTime(msg.createdAt) }}
                   </div>
                 </div>
-                <div *ngIf="msg.reactions.length > 0" class="absolute -bottom-1.5 left-0 flex gap-0.5">
-                  <span *ngFor="let reaction of msg.reactions"
-                    class="bg-white dark:bg-gray-600 px-1 py-0.5 rounded-full shadow-md text-[10px] border border-gray-200 dark:border-gray-500">
-                    {{ reaction.emoji }}
-                  </span>
+
+                <!-- Emoji trigger + picker row -->
+                <div class="flex items-center gap-1 mt-0.5"
+                  [class.justify-start]="!isCurrentUser(msg.senderId)"
+                  [class.justify-end]="isCurrentUser(msg.senderId)">
+
+                  <!-- Smiley button: hidden until message row is hovered -->
+                  <button
+                    [style.opacity]="hoveredMsgId === msg.id ? '1' : '0'"
+                    [style.pointer-events]="hoveredMsgId === msg.id ? 'auto' : 'none'"
+                    class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-xs leading-none p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600 transition-opacity"
+                    (click)="toggleReactionPicker(msg.id, $event)">
+                    <i class="far fa-smile"></i>
+                  </button>
+
+                  <!-- Inline reaction picker (opens below bubble) -->
+                  <div *ngIf="activeReactionMsgId === msg.id"
+                    class="reaction-picker flex items-center gap-0.5 bg-white dark:bg-gray-700 rounded-full shadow-md px-1.5 py-0.5 border border-gray-200 dark:border-gray-600">
+                    <span *ngFor="let emoji of REACTIONS"
+                      class="text-sm cursor-pointer hover:scale-125 transition-transform select-none px-0.5"
+                      (click)="sendReaction(msg, emoji)">{{ emoji }}</span>
+                  </div>
+
+                  <!-- Existing reactions -->
+                  <ng-container *ngIf="activeReactionMsgId !== msg.id">
+                    <span *ngFor="let group of getGroupedReactions(msg.reactions)"
+                      class="flex items-center gap-0.5 bg-white dark:bg-gray-600 px-1 py-0.5 rounded-full shadow-sm text-[11px] border cursor-pointer hover:scale-110 transition-transform select-none"
+                      [class.border-green-400]="group.hasCurrentUser"
+                      [class.border-gray-200]="!group.hasCurrentUser"
+                      (click)="sendReaction(msg, group.emoji)">
+                      {{ group.emoji }}<span *ngIf="group.count > 1" class="text-gray-500 dark:text-gray-300 font-medium ml-0.5">{{ group.count }}</span>
+                    </span>
+                  </ng-container>
                 </div>
               </div>
             </div>

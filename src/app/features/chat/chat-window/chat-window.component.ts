@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component, ElementRef, EventEmitter, Input, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
+import { ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { TokenService } from 'src/app/core/services/token.service';
@@ -40,6 +40,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   isTyping = false;
   typingText = '';
   private isAutoScrolling = false;
+  activeReactionMsgId: number | null = null;
+  hoveredMsgId: number | undefined | null = null;
+  readonly REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
   @ViewChild('video') videoElement!: ElementRef<HTMLVideoElement>;
   @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
@@ -76,8 +79,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       .subscribe(message => {
         console.log('📨 WebSocket message received:', message);
         if (message) {
-          console.log('✅ Adding message to current conversation');
-          this.addMessageToList(message);
+          if (message.type === 'REACTION' || message.messageType === 'REACTION') {
+            this.handleReactionUpdate(message);
+          } else {
+            console.log('✅ Adding message to current conversation');
+            this.addMessageToList(message);
+          }
         }
       });
 
@@ -502,6 +509,71 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   }
 
 
+
+  getGroupedReactions(reactions: any[]): { emoji: string; count: number; hasCurrentUser: boolean }[] {
+    const currentUserId = parseInt(this.tokenService.getUserId()!);
+    const map = new Map<string, { count: number; hasCurrentUser: boolean }>();
+    for (const r of reactions) {
+      const entry = map.get(r.emoji) || { count: 0, hasCurrentUser: false };
+      entry.count++;
+      if (r.userId === currentUserId) entry.hasCurrentUser = true;
+      map.set(r.emoji, entry);
+    }
+    return Array.from(map.entries()).map(([emoji, v]) => ({ emoji, ...v }));
+  }
+
+  private handleReactionUpdate(event: any) {
+    const msg = this.messages.find(m => m.id === event.messageId);
+    if (!msg) return;
+    msg.reactions = event.reactions || msg.reactions;
+  }
+
+  @HostListener('document:click')
+  onDocumentClick() { this.activeReactionMsgId = null; }
+
+  // ---------------------- Reactions ----------------------
+  toggleReactionPicker(msgId: number | undefined, event: MouseEvent) {
+    event.stopPropagation();
+    this.activeReactionMsgId = this.activeReactionMsgId === msgId ? null : (msgId ?? null);
+  }
+
+  closeReactionPicker() {
+    this.activeReactionMsgId = null;
+  }
+
+  // kept for template compatibility (no-ops now)
+  showReactionPicker(_id: number | undefined) {}
+  hideReactionPicker() {}
+
+  sendReaction(msg: ConversationMessage, emoji: string) {
+    if (!this.chatId || !msg.id) return;
+    const currentUserId = parseInt(this.tokenService.getUserId()!);
+    const existing = msg.reactions.findIndex(r => r.userId === currentUserId && r.emoji === emoji);
+
+    if (existing !== -1) {
+      // Remove reaction
+      msg.reactions.splice(existing, 1);
+      this.conversationService.removeReaction(msg.id, emoji)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({ error: () => msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', createdAt: '' }) });
+    } else {
+      // Remove any previous reaction by current user, then add new
+      const prevIdx = msg.reactions.findIndex(r => r.userId === currentUserId);
+      const prevEmoji = prevIdx !== -1 ? msg.reactions[prevIdx].emoji : null;
+      if (prevIdx !== -1) msg.reactions.splice(prevIdx, 1);
+      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', createdAt: new Date().toISOString() });
+
+      const add$ = () => this.conversationService.addReaction(msg.id!, emoji).pipe(takeUntil(this.destroy$));
+      if (prevEmoji) {
+        this.conversationService.removeReaction(msg.id, prevEmoji)
+          .pipe(takeUntil(this.destroy$))
+          .subscribe({ next: () => add$().subscribe(), error: () => {} });
+      } else {
+        add$().subscribe();
+      }
+    }
+    this.activeReactionMsgId = null;
+  }
 
   // ---------------------- Chat Info ----------------------
   toggleChatInfo() {

@@ -1,16 +1,26 @@
 <div class="h-screen w-full flex overflow-hidden bg-gray-50 dark:bg-gray-900">
-  <div class="w-[80px] border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-    <div class="flex flex-col h-full">
-      <div class="p-3 border-b border-gray-200 dark:border-gray-700">
-        <app-theme-toggle></app-theme-toggle>
-      </div>
-      <div class="flex-1">
-        <app-sidebar></app-sidebar>
-      </div>
+
+  <!-- Left sidebar: only on desktop >= 500px -->
+  <div class="hidden mobile:flex flex-col w-[80px] flex-shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+      <app-theme-toggle></app-theme-toggle>
+    </div>
+    <div class="flex-1">
+      <app-sidebar></app-sidebar>
     </div>
   </div>
 
-  <div class="flex-1 flex flex-col overflow-hidden">
+  <!-- Main content area -->
+  <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+
     <router-outlet></router-outlet>
+
+    <!-- Bottom nav bar: only on mobile < 500px, hidden when detail is open -->
+    <div *ngIf="showBottomNav"
+      class="flex mobile:hidden w-full flex-shrink-0 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <app-sidebar [mobileBottom]="true" class="w-full block"></app-sidebar>
+    </div>
+
   </div>
+
 </div>

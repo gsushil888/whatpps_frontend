@@ -36,6 +36,16 @@
     animation: fade-in 0.2s ease-out;
 }
 
+@keyframes reaction-pop {
+    from { opacity: 0; transform: scale(0.7) translateY(4px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.reaction-picker {
+    animation: reaction-pop 0.12s ease-out;
+    white-space: nowrap;
+}
+
 @keyframes slide-left {
     from {
         transform: translateX(100%);

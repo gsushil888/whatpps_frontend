@@ -48,14 +48,14 @@
           </span>
         </div>
         <div class="flex items-center justify-between">
-          <div class="flex items-center gap-1 flex-1 min-w-0">
+          <div class="flex items-center gap-1 min-w-0 flex-1 overflow-hidden">
             <i *ngIf="chat.lastMessageType === 'IMAGE'" class="fas fa-image text-gray-500 text-xs flex-shrink-0"></i>
             <i *ngIf="chat.lastMessageType === 'VIDEO'" class="fas fa-video text-gray-500 text-xs flex-shrink-0"></i>
             <i *ngIf="chat.lastMessageType === 'AUDIO'"
               class="fas fa-microphone text-gray-500 text-xs flex-shrink-0"></i>
             <i *ngIf="chat.lastMessageType === 'DOCUMENT'"
               class="fas fa-file-alt text-gray-500 text-xs flex-shrink-0"></i>
-            <p class="text-sm text-gray-600 dark:text-gray-300 truncate">
+            <p class="text-sm text-gray-600 dark:text-gray-300 truncate min-w-0 flex-1">
               <span *ngIf="chat.lastMessageType !== 'TEXT'" class="text-gray-500">
                 {{ getMediaTypeLabel(chat.lastMessageType || 'TEXT') }}
               </span>

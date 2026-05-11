@@ -211,4 +211,14 @@ export class ConversationService {
     const url = `${this.API_URL}/${conversationId}`;
     return this.http.delete(url, { headers: this.tokenService.getAuthHeaders() });
   }
+
+  addReaction(messageId: number, emoji: string): Observable<any> {
+    const url = `${environment.apiBaseUrl}messages/${messageId}/reactions`;
+    return this.http.post(url, { emoji }, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  removeReaction(messageId: number, emoji: string): Observable<any> {
+    const url = `${environment.apiBaseUrl}messages/${messageId}/reactions/${encodeURIComponent(emoji)}`;
+    return this.http.delete(url, { headers: this.tokenService.getAuthHeaders() });
+  }
 }

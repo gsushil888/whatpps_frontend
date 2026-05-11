@@ -2,6 +2,14 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  min-width: 0;
+}
+
+.chat-list-panel {
+  width: 350px;
+  min-width: 350px;
+  max-width: 350px;
+  flex-shrink: 0;
 }
 
 /* Custom scrollbar styling for chat list */
