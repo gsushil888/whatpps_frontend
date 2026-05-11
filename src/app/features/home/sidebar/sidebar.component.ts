@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from 'src/app/core/services/auth.service';
 import { UserProfile, UserService } from '../../chat/services/user.service';
@@ -14,6 +14,7 @@ interface SidebarItem {
   templateUrl: './sidebar.component.html'
 })
 export class SidebarComponent implements OnInit {
+  @Input() mobileBottom = false;
   sidebarItems: SidebarItem[] = [
     { label: 'Chats', icon: 'fas fa-comments', route: 'chat' },
     { label: 'Status', icon: 'fas fa-circle-notch', route: 'status' },

@@ -1,7 +1,8 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Router } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
+import { ChatService } from '../../chat/services/chat.service';
 
 @Component({
   selector: 'app-home-layout',
@@ -10,17 +11,30 @@ import { Subject } from 'rxjs';
 })
 export class HomeLayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
+  showBottomNav = true;
+  selectedChatId: string | null = null;
 
-  constructor(private router: Router) { }
+  constructor(private router: Router, private chatService: ChatService) { }
 
   ngOnInit(): void {
-    console.log('🏠 HomeLayout ngOnInit - Current URL:', this.router.url);
-    
-    this.router.events.pipe(
-      takeUntil(this.destroy$)
-    ).subscribe((event) => {
-      console.log('🏠 HomeLayout router event:', event);
+    this.chatService.selectedChatId$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(id => {
+        this.selectedChatId = id;
+        this.updateBottomNav();
+      });
+
+    this.router.events.pipe(takeUntil(this.destroy$)).subscribe(e => {
+      if (e instanceof NavigationEnd) this.updateBottomNav();
     });
+  }
+
+  private updateBottomNav() {
+    const url = this.router.url;
+    // Hide bottom nav when a detail is open on mobile
+    const inChat = url.includes('/chat') && !!this.selectedChatId;
+    const inDetail = url.includes('/status') || url.includes('/call');
+    this.showBottomNav = !(inChat || inDetail);
   }
 
   ngOnDestroy(): void {

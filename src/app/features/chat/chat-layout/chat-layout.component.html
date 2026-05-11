@@ -1,9 +1,9 @@
-<div class="flex flex-1 min-h-0 bg-white dark:bg-gray-900">
-  <!-- Left Panel: full width on mobile when no chat selected, fixed width on desktop -->
-  <div class="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800"
+<div class="flex flex-1 min-h-0 min-w-0 bg-white dark:bg-gray-900">
+  <!-- Left Panel -->
+  <div class="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800 overflow-hidden"
     [class.hidden]="isMobile && selectedChatId"
     [class.w-full]="isMobile"
-    [class.w-\[350px\]]="!isMobile">
+    [class.chat-list-panel]="!isMobile">
     <ng-container *ngIf="!showNewChatView">
       <app-chat-search></app-chat-search>
       <div class="flex-1 min-h-0 overflow-y-auto">
@@ -13,8 +13,8 @@
     <app-new-chat *ngIf="showNewChatView"></app-new-chat>
   </div>
 
-  <!-- Right Panel: hidden on mobile when no chat selected -->
-  <div class="flex-1 min-h-0 bg-gray-50 dark:bg-gray-900"
+  <!-- Right Panel -->
+  <div class="flex-1 min-h-0 min-w-0 bg-gray-50 dark:bg-gray-900"
     [class.hidden]="isMobile && !selectedChatId">
     <app-chat-window [isMobile]="isMobile" (backToList)="clearSelection()"></app-chat-window>
   </div>

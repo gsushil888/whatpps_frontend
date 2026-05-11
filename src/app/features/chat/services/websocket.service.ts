@@ -54,6 +54,16 @@ export class WebSocketService {
     this.stompClient.activate();
   }
 
+  sendReaction(conversationId: number, messageId: number, emoji: string): void {
+    if (this.stompClient?.connected) {
+      this.stompClient.publish({
+        destination: '/app/chat.reaction',
+        body: JSON.stringify({ messageId, emoji }),
+        headers: { 'conversationId': conversationId.toString() }
+      });
+    }
+  }
+
   sendMessage(conversationId: number, message: ChatMessage): void {
     if (this.stompClient?.connected) {
       this.stompClient.publish({
