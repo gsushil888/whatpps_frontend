@@ -1,4 +1,5 @@
 import { Component, HostListener, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
 import { StatusService } from '../services/status.service';
 
 @Component({
@@ -12,11 +13,13 @@ export class StatusLayoutComponent implements OnInit {
   @HostListener('window:resize')
   onResize() { this.isMobile = window.innerWidth < 790; }
 
-  constructor(private statusService: StatusService) { }
+  constructor(private statusService: StatusService, private router: Router) { }
 
   ngOnInit() {
     this.statusService.selectedStatusId$.subscribe(id => { this.selectedStatusId = id; });
   }
 
   clearSelection() { this.statusService.clearSelection(); }
+
+  goHome() { this.router.navigate(['/home/chat']); }
 }

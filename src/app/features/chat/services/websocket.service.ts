@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Client, IMessage } from '@stomp/stompjs';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import * as SockJS from 'sockjs-client';
 import { PresenceService } from 'src/app/core/services/presence.service';
 import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
@@ -21,8 +21,25 @@ export interface ChatMessage {
 export class WebSocketService {
   private stompClient: Client | null = null;
   private messageSubject = new BehaviorSubject<any>(null);
+  private messageStatusSubject = new Subject<{ messageId: number; conversationId: number; status: string }>();
+  private reactionSubject = new Subject<{ messageId: number; conversationId: number; emoji: string; action: string; reactorId: number; reactorName: string }>();
+  private unreadUpdateSubject = new Subject<{
+    conversationId: number;
+    action: string;
+    lastMessage?: {
+      id: number;
+      content: string;
+      messageType: string;
+      senderId: number;
+      senderName: string;
+      timestamp: string;
+    };
+  }>();
 
   message$ = this.messageSubject.asObservable();
+  messageStatus$ = this.messageStatusSubject.asObservable();
+  reaction$ = this.reactionSubject.asObservable();
+  unreadUpdate$ = this.unreadUpdateSubject.asObservable();
 
   constructor(
     private tokenService: TokenService,
@@ -47,6 +64,12 @@ export class WebSocketService {
       this.stompClient?.subscribe(`/queue/messages/${userId}`, (message: IMessage) => {
         this.messageSubject.next(JSON.parse(message.body));
       });
+      this.stompClient?.subscribe(`/user/queue/message-status`, (message: IMessage) => {
+        this.messageStatusSubject.next(JSON.parse(message.body));
+      });
+      this.stompClient?.subscribe(`/user/queue/unread-update`, (message: IMessage) => {
+        this.unreadUpdateSubject.next(JSON.parse(message.body));
+      });
       this.presenceService.initialize(this.stompClient!);
       this.typingIndicatorService.initialize(this.stompClient!, parseInt(userId));
     };
@@ -54,12 +77,20 @@ export class WebSocketService {
     this.stompClient.activate();
   }
 
-  sendReaction(conversationId: number, messageId: number, emoji: string): void {
+  sendReaction(conversationId: number, messageId: number, emoji: string, action: 'add' | 'remove'): void {
     if (this.stompClient?.connected) {
       this.stompClient.publish({
         destination: '/app/chat.reaction',
-        body: JSON.stringify({ messageId, emoji }),
-        headers: { 'conversationId': conversationId.toString() }
+        body: JSON.stringify({ messageId, conversationId, emoji, action })
+      });
+    }
+  }
+
+  publishStatus(messageId: number, conversationId: number, status: 'DELIVERED' | 'READ'): void {
+    if (this.stompClient?.connected) {
+      this.stompClient.publish({
+        destination: '/app/chat.status',
+        body: JSON.stringify({ messageId, conversationId, status })
       });
     }
   }
@@ -76,8 +107,13 @@ export class WebSocketService {
 
   subscribeToConversation(conversationId: number): void {
     if (this.stompClient?.connected) {
-      this.stompClient.subscribe(`/topic/conversation/${conversationId}`, (message: IMessage) => {
-        this.messageSubject.next(JSON.parse(message.body));
+      this.stompClient.subscribe(`/user/queue/conversation/${conversationId}`, (message: IMessage) => {
+        const parsed = JSON.parse(message.body);
+        parsed.conversationId = conversationId;
+        this.messageSubject.next(parsed);
+      });
+      this.stompClient.subscribe(`/user/queue/reaction/${conversationId}`, (message: IMessage) => {
+        this.reactionSubject.next(JSON.parse(message.body));
       });
     }
   }

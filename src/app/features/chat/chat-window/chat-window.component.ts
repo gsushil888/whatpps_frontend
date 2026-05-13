@@ -41,7 +41,6 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   typingText = '';
   private isAutoScrolling = false;
   activeReactionMsgId: number | null = null;
-  hoveredMsgId: number | undefined | null = null;
   readonly REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
   @ViewChild('video') videoElement!: ElementRef<HTMLVideoElement>;
@@ -79,12 +78,33 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       .subscribe(message => {
         console.log('📨 WebSocket message received:', message);
         if (message) {
-          if (message.type === 'REACTION' || message.messageType === 'REACTION') {
-            this.handleReactionUpdate(message);
-          } else {
-            console.log('✅ Adding message to current conversation');
-            this.addMessageToList(message);
+          console.log('✅ Adding message to current conversation');
+          this.addMessageToList(message);
+          const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+          if (message.id && message.senderId !== currentUserId && this.chatId) {
+            this.webSocketService.publishStatus(message.id, parseInt(this.chatId), 'DELIVERED');
+            this.webSocketService.publishStatus(message.id, parseInt(this.chatId), 'READ');
           }
+        }
+      });
+
+    // Subscribe to reaction updates on dedicated queue
+    this.webSocketService.reaction$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => this.handleReactionUpdate(event));
+
+    // Subscribe to message status updates (tick updates for sent messages)
+    this.webSocketService.messageStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(statusUpdate => {
+        const msg = this.messages.find(m => m.id === statusUpdate.messageId);
+        if (msg) {
+          if (statusUpdate.status === 'DELIVERED') {
+            msg.deliveryStatus = { ...msg.deliveryStatus, delivered: 1 };
+          } else if (statusUpdate.status === 'READ') {
+            msg.deliveryStatus = { ...msg.deliveryStatus, delivered: 1, read: 1 };
+          }
+          this.cdr.markForCheck();
         }
       });
 
@@ -128,6 +148,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       console.log('🔔 Subscribing to conversation:', conversationId);
       this.webSocketService.subscribeToConversation(conversationId);
       this.typingIndicatorService.subscribeToConversation(conversationId);
+
+      // Clear unread badge when opening conversation
+      this.chatService.clearUnreadCount(conversationId);
     }
   }
 
@@ -144,6 +167,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
               this.messages = response.data.messages.reverse();
               this.hasMoreMessages = response.data.pagination.hasNext;
               setTimeout(() => this.scrollToBottom(), 0);
+              // Mark all unread messages as READ
+              this.markUnreadMessagesAsRead();
             }
             this.isLoadingMessages = false;
           },
@@ -160,6 +185,19 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
           this.conversationType = chat?.type || 'INDIVIDUAL';
         });
     }
+  }
+
+  private markUnreadMessagesAsRead() {
+    if (!this.chatId) return;
+    const conversationId = parseInt(this.chatId);
+    const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+    this.messages
+      .filter(m => m.senderId !== currentUserId && m.deliveryStatus.read === 0)
+      .forEach(m => {
+        if (m.id) {
+          this.webSocketService.publishStatus(m.id, conversationId, 'READ');
+        }
+      });
   }
 
   getChatName(): string {
@@ -206,6 +244,13 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     if (!this.isGroupChat() || this.isCurrentUser(msg.senderId)) return false;
     if (index === 0) return true;
     return this.messages[index - 1].senderId !== msg.senderId;
+  }
+
+  isFirstInSenderGroup(index: number): boolean {
+    const msg = this.messages[index];
+    const prev = this.messages[index - 1];
+    if (!prev) return true;
+    return prev.senderId !== msg.senderId;
   }
 
   getSenderDisplayName(msg: ConversationMessage): string {
@@ -315,7 +360,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
         this.chatId,
         newMessage.content || '',
         newMessage.messageType,
-        newMessage.createdAt
+        newMessage.createdAt,
+        newMessage.senderId,
+        newMessage.senderName
       );
     }
 
@@ -510,6 +557,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
 
 
+  private pendingReactions = new Set<string>();
+
   getGroupedReactions(reactions: any[]): { emoji: string; count: number; hasCurrentUser: boolean }[] {
     const currentUserId = parseInt(this.tokenService.getUserId()!);
     const map = new Map<string, { count: number; hasCurrentUser: boolean }>();
@@ -525,7 +574,17 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   private handleReactionUpdate(event: any) {
     const msg = this.messages.find(m => m.id === event.messageId);
     if (!msg) return;
-    msg.reactions = event.reactions || msg.reactions;
+
+    const reactorId = event.reactorId ?? event.userId ?? parseInt(this.tokenService.getUserId()!);
+    const reactorName = event.reactorName ?? '';
+
+    if (event.action === 'remove') {
+      msg.reactions = msg.reactions.filter(r => !(r.emoji === event.emoji && r.userId === reactorId));
+    } else {
+      msg.reactions = msg.reactions.filter(r => r.userId !== reactorId);
+      msg.reactions.push({ emoji: event.emoji, userId: reactorId, displayName: reactorName, createdAt: new Date().toISOString() });
+    }
+    this.cdr.markForCheck();
   }
 
   @HostListener('document:click')
@@ -547,30 +606,25 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   sendReaction(msg: ConversationMessage, emoji: string) {
     if (!this.chatId || !msg.id) return;
+    const conversationId = parseInt(this.chatId);
     const currentUserId = parseInt(this.tokenService.getUserId()!);
     const existing = msg.reactions.findIndex(r => r.userId === currentUserId && r.emoji === emoji);
 
     if (existing !== -1) {
-      // Remove reaction
+      // Optimistic remove
       msg.reactions.splice(existing, 1);
-      this.conversationService.removeReaction(msg.id, emoji)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({ error: () => msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', createdAt: '' }) });
+      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'remove');
     } else {
-      // Remove any previous reaction by current user, then add new
+      // Remove previous reaction by current user if any
       const prevIdx = msg.reactions.findIndex(r => r.userId === currentUserId);
       const prevEmoji = prevIdx !== -1 ? msg.reactions[prevIdx].emoji : null;
-      if (prevIdx !== -1) msg.reactions.splice(prevIdx, 1);
-      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', createdAt: new Date().toISOString() });
-
-      const add$ = () => this.conversationService.addReaction(msg.id!, emoji).pipe(takeUntil(this.destroy$));
-      if (prevEmoji) {
-        this.conversationService.removeReaction(msg.id, prevEmoji)
-          .pipe(takeUntil(this.destroy$))
-          .subscribe({ next: () => add$().subscribe(), error: () => {} });
-      } else {
-        add$().subscribe();
+      if (prevIdx !== -1) {
+        msg.reactions.splice(prevIdx, 1);
+        this.webSocketService.sendReaction(conversationId, msg.id, prevEmoji!, 'remove');
       }
+      // Optimistic add
+      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', createdAt: new Date().toISOString() });
+      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'add');
     }
     this.activeReactionMsgId = null;
   }

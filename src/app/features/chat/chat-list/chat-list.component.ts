@@ -5,6 +5,7 @@ import { Chat, ChatService } from '../services/chat.service';
 import { Contact, ContactService } from '../services/contact.service';
 import { ConversationService } from '../services/conversation.service';
 import { PresenceService } from 'src/app/core/services/presence.service';
+import { TokenService } from 'src/app/core/services/token.service';
 
 @Component({
   selector: 'app-chat-list',
@@ -14,6 +15,7 @@ export class ChatListComponent implements OnInit, OnDestroy {
   chats: Chat[] = [];
   contacts: Contact[] = [];
   selectedChatId: string | null = null;
+  currentUserId: number = 0;
   private destroy$ = new Subject<void>();
   filters = ['All', 'Favourite', 'Archived'];
   activeFilter = 'All';
@@ -33,10 +35,13 @@ export class ChatListComponent implements OnInit, OnDestroy {
     private contactService: ContactService,
     private conversationService: ConversationService,
     private presenceService: PresenceService,
+    private tokenService: TokenService,
     private cdr: ChangeDetectorRef
   ) { }
 
   ngOnInit(): void {
+    this.currentUserId = parseInt(this.tokenService.getUserId() || '0');
+
     this.chatService.chats$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(chats => {
