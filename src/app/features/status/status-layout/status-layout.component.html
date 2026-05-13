@@ -5,6 +5,9 @@
     [style.width]="isMobile ? '100%' : '400px'">
     <div class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between px-4">
       <div class="flex items-center gap-3">
+        <button *ngIf="isMobile" (click)="goHome()" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+          <i class="fas fa-arrow-left text-gray-600 dark:text-gray-300"></i>
+        </button>
         <img src="assets/google.svg" class="w-10 h-10 rounded-full" alt="profile" />
         <h1 class="font-semibold text-gray-800 dark:text-gray-200">Status</h1>
       </div>

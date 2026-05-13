@@ -11,6 +11,8 @@ export interface Chat {
   time: string;
   lastMessage: string;
   lastMessageType?: string;
+  lastMessageSenderId?: number;
+  lastMessageSenderName?: string;
   unreadCount: number;
   type?: string;
   isOnline?: boolean | null;
@@ -103,6 +105,8 @@ export class ChatService {
       time: timestamp ? this.formatTime(timestamp) : '',
       lastMessage: conversation.lastMessage?.content || '',
       lastMessageType: conversation.lastMessage?.type || 'TEXT',
+      lastMessageSenderId: conversation.lastMessage?.sender?.id,
+      lastMessageSenderName: conversation.lastMessage?.sender?.displayName,
       unreadCount: conversation.unreadCount || 0,
       type: conversation.type,
       isOnline: conversation.isOnline,
@@ -167,13 +171,52 @@ export class ChatService {
     return this.chatsSubject.value.find(chat => chat.id === conversationId.toString());
   }
 
-  updateChatLastMessage(chatId: string, lastMessage: string, lastMessageType: string, timestamp: string) {
+  updateChatLastMessage(chatId: string, lastMessage: string, lastMessageType: string, timestamp: string, senderId?: number, senderName?: string) {
     const chats = this.chatsSubject.value.map(c =>
       c.id === chatId
-        ? { ...c, lastMessage, lastMessageType, lastMessageAt: timestamp, date: this.formatDate(timestamp), time: this.formatTime(timestamp) }
+        ? { ...c, lastMessage, lastMessageType, lastMessageSenderId: senderId, lastMessageSenderName: senderName, lastMessageAt: timestamp, date: this.formatDate(timestamp), time: this.formatTime(timestamp) }
         : c
     );
     this.chatsSubject.next(this.sortByLatest(chats));
+  }
+
+  updateChatFromUnreadEvent(
+    conversationId: number,
+    lastMessage: { content: string; messageType: string; timestamp: string; senderId?: number; senderName?: string },
+    incrementUnread: boolean
+  ) {
+    const id = conversationId.toString();
+    const chats = this.chatsSubject.value.map(c => {
+      if (c.id !== id) return c;
+      return {
+        ...c,
+        lastMessage: lastMessage.content,
+        lastMessageType: lastMessage.messageType,
+        lastMessageSenderId: lastMessage.senderId,
+        lastMessageSenderName: lastMessage.senderName,
+        lastMessageAt: lastMessage.timestamp,
+        date: this.formatDate(lastMessage.timestamp),
+        time: this.formatTime(lastMessage.timestamp),
+        unreadCount: incrementUnread ? (c.unreadCount || 0) + 1 : c.unreadCount
+      };
+    });
+    this.chatsSubject.next(this.sortByLatest(chats));
+  }
+
+  incrementUnreadCount(conversationId: number) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === conversationId.toString()
+        ? { ...c, unreadCount: (c.unreadCount || 0) + 1 }
+        : c
+    );
+    this.chatsSubject.next(chats);
+  }
+
+  clearUnreadCount(conversationId: number) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === conversationId.toString() ? { ...c, unreadCount: 0 } : c
+    );
+    this.chatsSubject.next(chats);
   }
 
   removeChat(chatId: string) {

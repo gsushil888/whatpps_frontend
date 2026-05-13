@@ -56,18 +56,22 @@
             <i *ngIf="chat.lastMessageType === 'DOCUMENT'"
               class="fas fa-file-alt text-gray-500 text-xs flex-shrink-0"></i>
             <p class="text-sm text-gray-600 dark:text-gray-300 truncate min-w-0 flex-1">
+              <!-- Group chat: show sender first name as prefix -->
+              <span *ngIf="chat.type === 'GROUP' && chat.lastMessageSenderName" class="text-gray-500 font-medium">
+                {{ chat.lastMessageSenderId === currentUserId ? 'You' : chat.lastMessageSenderName.split(' ')[0] }}: 
+              </span>
+              <!-- Individual chat: show 'You:' only if current user sent it -->
+              <span *ngIf="chat.type !== 'GROUP' && chat.lastMessageSenderId === currentUserId" class="text-gray-500">You: </span>
               <span *ngIf="chat.lastMessageType !== 'TEXT'" class="text-gray-500">
                 {{ getMediaTypeLabel(chat.lastMessageType || 'TEXT') }}
               </span>
-              <span *ngIf="chat.lastMessageType === 'TEXT' || chat.lastMessage">
-                {{ chat.lastMessage }}
-              </span>
+              <span *ngIf="chat.lastMessageType === 'TEXT'">{{ chat.lastMessage }}</span>
             </p>
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 ml-2">
             <div *ngIf="chat.unreadCount > 0"
-              class="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-              <span class="text-xs text-white font-medium">{{ chat.unreadCount }}</span>
+              class="min-w-[20px] h-5 bg-green-500 rounded-full flex items-center justify-center px-1">
+              <span class="text-xs text-white font-medium">{{ chat.unreadCount > 99 ? '99+' : chat.unreadCount }}</span>
             </div>
           </div>
         </div>

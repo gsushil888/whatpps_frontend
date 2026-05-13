@@ -103,12 +103,14 @@ export class OtpVerificationComponent implements OnInit, OnDestroy {
         },
         error: (error) => {
           this.loaderService.hideSpinner();
-          if (error.status === 401 || error.status === 403 || error.error?.message?.toLowerCase().includes('expired')) {
-            sessionStorage.clear();
-            this.toast.error('OTP expired. Please login again.');
-            this.router.navigate(['/auth/login']);
+          const message = error.error?.message || 'Invalid OTP';
+          if (message.toLowerCase().includes('expired')) {
+            this.toast.error(message);
+            this.timerSub?.unsubscribe();
+            this.resendTimer = 0;
+            this.canResend = true;
           } else {
-            this.toast.error(error.error?.message || 'Invalid OTP');
+            this.toast.error(message);
           }
         }
       });
