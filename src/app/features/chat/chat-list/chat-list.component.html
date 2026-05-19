@@ -32,7 +32,7 @@
       [class.dark:bg-green-900]="chat.id === selectedChatId" [class.border-l-4]="chat.id === selectedChatId"
       [class.border-l-green-500]="chat.id === selectedChatId">
       <div class="relative">
-        <img [src]="chat.avatar" class="w-12 h-12 rounded-full object-cover" alt="avatar" />
+        <img [src]="chat.avatar" class="w-12 h-12 rounded-full object-cover cursor-pointer" alt="avatar" (click)="openAvatarModal(chat.avatar, $event)" />
         <div *ngIf="isUserOnline(chat)"
           class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800">
         </div>
@@ -82,6 +82,11 @@
         </div>
       </div>
     </div>
+
+  <!-- Profile Image Modal -->
+  <div *ngIf="selectedAvatarUrl" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80" (click)="closeAvatarModal()">
+    <img [src]="selectedAvatarUrl" class="max-w-xs max-h-[80vh] rounded-xl object-contain" (click)="$event.stopPropagation()" />
+  </div>
 
     <div *ngIf="chats.length === 0"
       class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">

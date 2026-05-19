@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { NavigationCancel, NavigationEnd, NavigationError, NavigationStart, Router } from '@angular/router';
-import { LoaderService } from './shared/services/loader.service';
 import { TokenService } from './core/services/token.service';
+import { LoaderService } from './shared/services/loader.service';
 
 @Component({
   selector: 'app-root',

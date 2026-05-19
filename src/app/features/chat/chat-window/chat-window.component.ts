@@ -6,6 +6,7 @@ import { PresenceService } from 'src/app/core/services/presence.service';
 import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
 import { Chat, ChatService } from '../services/chat.service';
 import { ConversationMessage, ConversationService } from '../services/conversation.service';
+import { ContactService } from '../services/contact.service';
 import { WebSocketService } from '../services/websocket.service';
 
 @Component({
@@ -49,6 +50,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   constructor(
     private chatService: ChatService,
     private conversationService: ConversationService,
+    private contactService: ContactService,
     private tokenService: TokenService,
     private webSocketService: WebSocketService,
     private presenceService: PresenceService,
@@ -81,9 +83,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
           console.log('✅ Adding message to current conversation');
           this.addMessageToList(message);
           const currentUserId = parseInt(this.tokenService.getUserId() || '0');
-          if (message.id && message.senderId !== currentUserId && this.chatId) {
-            this.webSocketService.publishStatus(message.id, parseInt(this.chatId), 'DELIVERED');
-            this.webSocketService.publishStatus(message.id, parseInt(this.chatId), 'READ');
+          if (message.senderId !== currentUserId && this.chatId) {
+            this.webSocketService.markConversationAsRead(parseInt(this.chatId));
           }
         }
       });
@@ -149,8 +150,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       this.webSocketService.subscribeToConversation(conversationId);
       this.typingIndicatorService.subscribeToConversation(conversationId);
 
-      // Clear unread badge when opening conversation
+      // Clear unread badge locally and persist to backend
       this.chatService.clearUnreadCount(conversationId);
+      this.webSocketService.markConversationAsRead(conversationId);
     }
   }
 
@@ -189,15 +191,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   private markUnreadMessagesAsRead() {
     if (!this.chatId) return;
-    const conversationId = parseInt(this.chatId);
-    const currentUserId = parseInt(this.tokenService.getUserId() || '0');
-    this.messages
-      .filter(m => m.senderId !== currentUserId && m.deliveryStatus.read === 0)
-      .forEach(m => {
-        if (m.id) {
-          this.webSocketService.publishStatus(m.id, conversationId, 'READ');
-        }
-      });
+    this.webSocketService.markConversationAsRead(parseInt(this.chatId));
   }
 
   getChatName(): string {
@@ -648,20 +642,53 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   }
 
   deleteChat() {
-    if (this.chatId && confirm('Are you sure you want to delete this conversation?')) {
-      this.conversationService.deleteConversation(this.chatId)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: (response) => {
-            if (response.success) {
-              this.chatService.removeChat(this.chatId!);
-              this.chatService.clearSelection();
-              this.showMenuModal = false;
-            }
-          },
-          error: (err) => console.error('Error deleting conversation:', err)
-        });
+    if (!this.chatId || !confirm('Delete this chat? This cannot be undone.')) return;
+    const chat = this.currentChat;
+    // For INDIVIDUAL chats, also delete the contact record so the conversation is fully removed
+    const deleteConv = () => this.conversationService.deleteConversation(this.chatId!)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.chatService.removeChat(this.chatId!);
+          this.chatService.clearSelection();
+          this.showMenuModal = false;
+        },
+        error: (err) => console.error('Error deleting conversation:', err)
+      });
+
+    if (chat?.type === 'INDIVIDUAL' && chat.otherUserId) {
+      // Find contact by otherUserId and delete it first
+      this.contactService.getContacts().pipe(takeUntil(this.destroy$)).subscribe({
+        next: (res) => {
+          const contact = res.data.contacts.find(c => c.contactUserId === chat.otherUserId);
+          if (contact) {
+            this.contactService.deleteContact(contact.id).pipe(takeUntil(this.destroy$)).subscribe({
+              next: () => deleteConv(),
+              error: () => deleteConv()
+            });
+          } else {
+            deleteConv();
+          }
+        },
+        error: () => deleteConv()
+      });
+    } else {
+      deleteConv();
     }
+  }
+
+  clearMessages() {
+    if (!this.chatId || !confirm('Clear all messages? Only you will see this change.')) return;
+    this.conversationService.clearConversation(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.messages = [];
+          this.chatService.updateChatLastMessage(this.chatId!, '', 'TEXT', new Date().toISOString());
+          this.showMenuModal = false;
+        },
+        error: (err) => console.error('Error clearing conversation:', err)
+      });
   }
 
   private scrollToBottom(): void {

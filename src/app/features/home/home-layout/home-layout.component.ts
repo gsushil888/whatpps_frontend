@@ -3,6 +3,7 @@ import { NavigationEnd, Router } from '@angular/router';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { ChatService } from '../../chat/services/chat.service';
+import { WebSocketService } from '../../chat/services/websocket.service';
 
 @Component({
   selector: 'app-home-layout',
@@ -14,9 +15,15 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
   showBottomNav = true;
   selectedChatId: string | null = null;
 
-  constructor(private router: Router, private chatService: ChatService) { }
+  constructor(
+    private router: Router,
+    private chatService: ChatService,
+    private webSocketService: WebSocketService
+  ) { }
 
   ngOnInit(): void {
+    this.webSocketService.connect();
+
     this.chatService.selectedChatId$
       .pipe(takeUntil(this.destroy$))
       .subscribe(id => {
@@ -31,7 +38,6 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
 
   private updateBottomNav() {
     const url = this.router.url;
-    // Hide bottom nav when a detail is open on mobile
     const inChat = url.includes('/chat') && !!this.selectedChatId;
     const inDetail = url.includes('/status') || url.includes('/call');
     this.showBottomNav = !(inChat || inDetail);
@@ -40,5 +46,6 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.webSocketService.disconnect();
   }
 }

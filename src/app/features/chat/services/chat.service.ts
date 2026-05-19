@@ -19,6 +19,7 @@ export interface Chat {
   lastActiveAt?: string | null;
   otherUserId?: number;
   lastMessageAt?: string | null;
+  createdAt?: string | null;
 }
 
 @Injectable({
@@ -50,8 +51,8 @@ export class ChatService {
 
   private sortByLatest(chats: Chat[]): Chat[] {
     return [...chats].sort((a, b) => {
-      const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
-      const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+      const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : new Date(a.createdAt || 0).getTime();
+      const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : new Date(b.createdAt || 0).getTime();
       return tb - ta;
     });
   }
@@ -112,7 +113,8 @@ export class ChatService {
       isOnline: conversation.isOnline,
       lastActiveAt: conversation.lastActiveAt,
       otherUserId: otherUserId,
-      lastMessageAt: conversation.lastMessage?.timestamp || conversation.lastMessageAt || null
+      lastMessageAt: conversation.lastMessage?.timestamp || conversation.lastMessageAt || null,
+      createdAt: conversation.createdAt || null
     };
   }
 
@@ -142,6 +144,14 @@ export class ChatService {
 
   clearSelection() {
     this.selectedChatIdSubject.next(null);
+  }
+
+  reloadConversations() {
+    this.loadConversations(this.activeFilterSubject.value);
+  }
+
+  mapConversation(conversation: Conversation): Chat {
+    return this.mapConversationToChat(conversation);
   }
 
   addNewChat(chat: Chat) {

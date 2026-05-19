@@ -17,12 +17,14 @@ export class PresenceService {
   presence$ = this.presenceSubject.asObservable();
 
   private stompClient: Client | null = null;
+  private visibilityHandler: (() => void) | null = null;
 
   constructor(private tokenService: TokenService) { }
 
   initialize(stompClient: Client) {
     this.stompClient = stompClient;
     this.subscribeToPresenceUpdates();
+    this.updateStatus('ONLINE');
     this.setupVisibilityHandler();
   }
 
@@ -30,7 +32,6 @@ export class PresenceService {
     if (this.stompClient) {
       this.stompClient.subscribe('/topic/presence', (message) => {
         const update: UserPresence = JSON.parse(message.body);
-        console.log('Presence update received:', update);
         this.updateUserPresence(update);
       });
     }
@@ -44,7 +45,6 @@ export class PresenceService {
 
   private updateStatus(status: 'AWAY' | 'ONLINE') {
     if (this.stompClient?.connected) {
-      console.log('Sending presence update:', status);
       this.stompClient.publish({
         destination: '/app/presence.update',
         body: JSON.stringify({ status })
@@ -53,13 +53,13 @@ export class PresenceService {
   }
 
   private setupVisibilityHandler() {
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden') {
-        this.updateStatus('AWAY');
-      } else {
-        this.updateStatus('ONLINE');
-      }
-    });
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+    }
+    this.visibilityHandler = () => {
+      this.updateStatus(document.visibilityState === 'hidden' ? 'AWAY' : 'ONLINE');
+    };
+    document.addEventListener('visibilitychange', this.visibilityHandler);
   }
 
   getUserPresence(userId: number): UserPresence | undefined {
@@ -89,6 +89,10 @@ export class PresenceService {
   }
 
   destroy() {
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
     this.stompClient = null;
   }
 }

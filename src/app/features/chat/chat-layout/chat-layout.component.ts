@@ -28,7 +28,6 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.chatService.initializeConversations();
     this.userService.loadCurrentUser().subscribe();
-    this.webSocketService.connect();
     this.chatService.showNewChatView$.subscribe(show => { this.showNewChatView = show; });
     this.chatService.selectedChatId$.subscribe(id => { this.selectedChatId = id; });
 
@@ -58,6 +57,26 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
           );
         }
       });
+
+    // New conversation pushed from backend (user was added to a new chat/group)
+    this.webSocketService.newConversation$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(payload => {
+        if (payload.conversationId && !payload.id) {
+          // INDIVIDUAL first-message push — partial payload, reload to get full conversation
+          this.chatService.reloadConversations();
+        } else {
+          // GROUP creation push — full ConversationResponse shape
+          this.chatService.addNewChat(this.chatService.mapConversation(payload));
+        }
+      });
+
+    // Existing group had participants added — reload to reflect updated participant list
+    this.webSocketService.conversationUpdate$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.chatService.reloadConversations();
+      });
   }
 
   clearSelection() { this.chatService.clearSelection(); }
@@ -65,6 +84,5 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-    this.webSocketService.disconnect();
   }
 }
