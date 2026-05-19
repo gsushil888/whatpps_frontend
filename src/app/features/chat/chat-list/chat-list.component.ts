@@ -29,6 +29,7 @@ export class ChatListComponent implements OnInit, OnDestroy {
   createGroupStep: 'select' | 'details' = 'select';
   groupImageFile: File | null = null;
   groupImagePreview: string | null = null;
+  selectedAvatarUrl: string | null = null;
 
   constructor(
     private chatService: ChatService,
@@ -71,6 +72,15 @@ export class ChatListComponent implements OnInit, OnDestroy {
 
   selectChat(chatId: string) {
     this.chatService.selectChat(chatId);
+  }
+
+  openAvatarModal(avatarUrl: string, event: Event) {
+    event.stopPropagation();
+    this.selectedAvatarUrl = avatarUrl;
+  }
+
+  closeAvatarModal() {
+    this.selectedAvatarUrl = null;
   }
 
   selectFilter(filter: string) {
@@ -139,20 +149,8 @@ export class ChatListComponent implements OnInit, OnDestroy {
           const conversationId = response.data.id.toString();
           
           const existingChat = this.chatService.findChatById(response.data.id);
-          
           if (!existingChat) {
-            const newChat = {
-              id: conversationId,
-              name: response.data.title,
-              avatar: response.data.profileImageUrl || 'assets/google.svg',
-              date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }),
-              time: 'now',
-              lastMessage: response.data.lastMessage?.content || '',
-              lastMessageType: response.data.lastMessage?.type || 'TEXT',
-              unreadCount: response.data.unreadCount || 0,
-              type: response.data.type
-            };
-            this.chatService.addNewChat(newChat);
+            this.chatService.addNewChat(this.chatService.mapConversation(response.data));
           }
           
           this.chatService.selectChat(conversationId);

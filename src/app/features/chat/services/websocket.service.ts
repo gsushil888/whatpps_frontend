@@ -3,8 +3,8 @@ import { Client, IMessage } from '@stomp/stompjs';
 import { BehaviorSubject, Subject } from 'rxjs';
 import * as SockJS from 'sockjs-client';
 import { PresenceService } from 'src/app/core/services/presence.service';
-import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
 import { TokenService } from 'src/app/core/services/token.service';
+import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
 import { environment } from 'src/environments/environment';
 
 export interface ChatMessage {
@@ -35,11 +35,15 @@ export class WebSocketService {
       timestamp: string;
     };
   }>();
+  private newConversationSubject = new Subject<any>();
+  private conversationUpdateSubject = new Subject<any>();
 
   message$ = this.messageSubject.asObservable();
   messageStatus$ = this.messageStatusSubject.asObservable();
   reaction$ = this.reactionSubject.asObservable();
   unreadUpdate$ = this.unreadUpdateSubject.asObservable();
+  newConversation$ = this.newConversationSubject.asObservable();
+  conversationUpdate$ = this.conversationUpdateSubject.asObservable();
 
   constructor(
     private tokenService: TokenService,
@@ -70,6 +74,12 @@ export class WebSocketService {
       this.stompClient?.subscribe(`/user/queue/unread-update`, (message: IMessage) => {
         this.unreadUpdateSubject.next(JSON.parse(message.body));
       });
+      this.stompClient?.subscribe(`/user/queue/new-conversation`, (message: IMessage) => {
+        this.newConversationSubject.next(JSON.parse(message.body));
+      });
+      this.stompClient?.subscribe(`/user/queue/conversation-update`, (message: IMessage) => {
+        this.conversationUpdateSubject.next(JSON.parse(message.body));
+      });
       this.presenceService.initialize(this.stompClient!);
       this.typingIndicatorService.initialize(this.stompClient!, parseInt(userId));
     };
@@ -82,6 +92,15 @@ export class WebSocketService {
       this.stompClient.publish({
         destination: '/app/chat.reaction',
         body: JSON.stringify({ messageId, conversationId, emoji, action })
+      });
+    }
+  }
+
+  markConversationAsRead(conversationId: number): void {
+    if (this.stompClient?.connected) {
+      this.stompClient.publish({
+        destination: '/app/chat.read',
+        body: JSON.stringify({ conversationId })
       });
     }
   }
