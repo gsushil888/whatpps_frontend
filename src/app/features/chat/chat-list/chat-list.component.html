@@ -26,7 +26,7 @@
 
   <!-- Conversations List -->
   <div *ngIf="!showContacts && !showCreateGroup">
-    <div *ngFor="let chat of chats"
+    <div *ngFor="let chat of filteredChats"
       class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       (click)="selectChat(chat.id)" [class.bg-green-50]="chat.id === selectedChatId"
       [class.dark:bg-green-900]="chat.id === selectedChatId" [class.border-l-4]="chat.id === selectedChatId"
@@ -88,17 +88,17 @@
     <img [src]="selectedAvatarUrl" class="max-w-xs max-h-[80vh] rounded-xl object-contain" (click)="$event.stopPropagation()" />
   </div>
 
-    <div *ngIf="chats.length === 0"
+    <div *ngIf="filteredChats.length === 0"
       class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
       <i class="fas fa-comments text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
-      <p class="text-lg font-medium">No chats yet</p>
-      <p class="text-sm">Search for contacts to start chatting</p>
+      <p class="text-lg font-medium">{{ listFilter ? 'No chats found' : 'No chats yet' }}</p>
+      <p class="text-sm">{{ listFilter ? 'Try a different search term' : 'Search for contacts to start chatting' }}</p>
     </div>
   </div>
 
   <!-- Contacts List -->
   <div *ngIf="showContacts && !showCreateGroup">
-    <div *ngFor="let contact of contacts"
+    <div *ngFor="let contact of filteredContacts"
       class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       (click)="selectContact(contact)">
       <div class="relative">
@@ -119,11 +119,11 @@
       </div>
     </div>
 
-    <div *ngIf="contacts.length === 0"
+    <div *ngIf="filteredContacts.length === 0"
       class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
       <i class="fas fa-address-book text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
-      <p class="text-lg font-medium">No contacts yet</p>
-      <p class="text-sm">Add contacts to start chatting</p>
+      <p class="text-lg font-medium">{{ listFilter ? 'No contacts found' : 'No contacts yet' }}</p>
+      <p class="text-sm">{{ listFilter ? 'Try a different search term' : 'Add contacts to start chatting' }}</p>
     </div>
   </div>
 

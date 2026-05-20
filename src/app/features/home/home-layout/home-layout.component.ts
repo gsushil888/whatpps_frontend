@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
@@ -41,6 +41,11 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
     const inChat = url.includes('/chat') && !!this.selectedChatId;
     const inDetail = url.includes('/status') || url.includes('/call');
     this.showBottomNav = !(inChat || inDetail);
+  }
+
+  @HostListener('window:beforeunload')
+  onBeforeUnload() {
+    this.webSocketService.disconnect();
   }
 
   ngOnDestroy(): void {

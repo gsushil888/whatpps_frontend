@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { TokenService } from 'src/app/core/services/token.service';
+import { PresenceService } from 'src/app/core/services/presence.service';
 import { Conversation, ConversationService } from './conversation.service';
 
 export interface Chat {
@@ -38,7 +39,20 @@ export class ChatService {
   private showNewChatViewSubject = new BehaviorSubject<boolean>(false);
   showNewChatView$ = this.showNewChatViewSubject.asObservable();
 
-  constructor(private conversationService: ConversationService, private tokenService: TokenService) { }
+  private listFilterSubject = new BehaviorSubject<string>('');
+  listFilter$ = this.listFilterSubject.asObservable();
+
+  setListFilter(term: string) { this.listFilterSubject.next(term); }
+
+  constructor(private conversationService: ConversationService, private tokenService: TokenService, private presenceService: PresenceService) {
+    this.presenceService.presenceBroadcast$.subscribe(presence => {
+      // When we receive a presence update for a userId, find any INDIVIDUAL chat
+      // whose otherUserId is undefined or doesn't match — we can't fix it here without
+      // knowing the mapping. But we CAN fix chats where otherUserId is undefined
+      // by checking if this userId appears as a sender in our known messages.
+      // The reliable fix: patch otherUserId when a message arrives from that user.
+    });
+  }
 
   initializeConversations() {
     this.loadConversations();
@@ -83,19 +97,17 @@ export class ChatService {
     // For individual chats, get the other user's ID
     let otherUserId: number | undefined;
     if (conversation.type === 'INDIVIDUAL') {
-      // Try participants array first
-      if (conversation.participants && conversation.participants.length > 0) {
+      // Backend may return otherUserId directly
+      if (conversation.otherUserId) {
+        otherUserId = conversation.otherUserId;
+      } else if (conversation.participants && conversation.participants.length > 0) {
         otherUserId = conversation.participants.find(p => p.userId !== currentUserId)?.userId;
       }
-      // Fallback: if last message sender is not current user, use that
+      // Fallback: use last message sender if they are not the current user
       if (!otherUserId && conversation.lastMessage?.sender?.id && conversation.lastMessage.sender.id !== currentUserId) {
         otherUserId = conversation.lastMessage.sender.id;
       }
-      // Fallback: if current user sent last message, try to extract from mobileNumber or title
-      if (!otherUserId && conversation.mobileNumber) {
-        // Backend should provide otherUserId, but as fallback we mark it for lazy loading
-        otherUserId = undefined;
-      }
+      console.log('[ChatService] mapped chat', conversation.id, 'otherUserId:', otherUserId, 'participants:', conversation.participants);
     }
 
     return {

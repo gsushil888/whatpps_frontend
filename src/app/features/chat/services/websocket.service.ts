@@ -139,9 +139,10 @@ export class WebSocketService {
 
   disconnect(): void {
     if (this.stompClient?.connected) {
-      this.presenceService.destroy();
+      this.presenceService.goOffline();
       // Give time for presence update before disconnecting
       setTimeout(() => {
+        this.presenceService.destroy();
         this.stompClient?.deactivate();
       }, 200);
     }

@@ -44,6 +44,7 @@ export interface Conversation {
   isOnline?: boolean | null;
   lastActiveAt?: string | null;
   participants?: Participant[];
+  otherUserId?: number;
 }
 
 export interface MessageResponse {

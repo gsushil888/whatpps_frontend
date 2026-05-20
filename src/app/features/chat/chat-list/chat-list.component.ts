@@ -13,6 +13,9 @@ import { TokenService } from 'src/app/core/services/token.service';
 })
 export class ChatListComponent implements OnInit, OnDestroy {
   chats: Chat[] = [];
+  filteredChats: Chat[] = [];
+  filteredContacts: Contact[] = [];
+  listFilter = '';
   contacts: Contact[] = [];
   selectedChatId: string | null = null;
   currentUserId: number = 0;
@@ -47,7 +50,14 @@ export class ChatListComponent implements OnInit, OnDestroy {
       takeUntil(this.destroy$)
     ).subscribe(chats => {
       this.chats = chats;
-      console.log('Chats loaded:', this.chats);
+      this.applyFilter();
+    });
+
+    this.chatService.listFilter$.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(term => {
+      this.listFilter = term;
+      this.applyFilter();
     });
 
     this.chatService.selectedChatId$.pipe(
@@ -68,6 +78,22 @@ export class ChatListComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  applyFilter() {
+    const q = this.listFilter.toLowerCase().trim();
+    this.filteredChats = q
+      ? this.chats.filter(c =>
+          c.name.toLowerCase().includes(q) ||
+          (c.lastMessage || '').toLowerCase().includes(q)
+        )
+      : this.chats;
+    this.filteredContacts = q
+      ? this.contacts.filter(c =>
+          c.displayName.toLowerCase().includes(q) ||
+          c.phoneNumber.includes(q)
+        )
+      : this.contacts;
   }
 
   selectChat(chatId: string) {
@@ -131,6 +157,7 @@ export class ChatListComponent implements OnInit, OnDestroy {
       next: (response) => {
         if (response.success) {
           this.contacts = response.data.contacts;
+          this.applyFilter();
         }
       },
       error: (err) => console.error('Error loading contacts:', err)
@@ -176,16 +203,11 @@ export class ChatListComponent implements OnInit, OnDestroy {
 
   isUserOnline(chat: Chat): boolean {
     if (chat.type === 'GROUP') return false;
-    
-    // Check WebSocket presence first, fallback to API data
     if (chat.otherUserId) {
       const presence = this.presenceService.getUserPresence(chat.otherUserId);
-      if (presence) {
-        return presence.status === 'ONLINE';
-      }
+      console.log('[ChatList] isUserOnline chat:', chat.id, 'otherUserId:', chat.otherUserId, 'presence:', presence);
+      if (presence) return presence.status === 'ONLINE';
     }
-    
-    // Fallback to static API data
     return chat.isOnline === true;
   }
 

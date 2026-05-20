@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Client } from '@stomp/stompjs';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { TokenService } from './token.service';
 
 export interface UserPresence {
@@ -15,6 +15,9 @@ export interface UserPresence {
 export class PresenceService {
   private presenceSubject = new BehaviorSubject<Map<number, UserPresence>>(new Map());
   presence$ = this.presenceSubject.asObservable();
+
+  private presenceBroadcastSubject = new Subject<UserPresence>();
+  presenceBroadcast$ = this.presenceBroadcastSubject.asObservable();
 
   private stompClient: Client | null = null;
   private visibilityHandler: (() => void) | null = null;
@@ -33,6 +36,7 @@ export class PresenceService {
       this.stompClient.subscribe('/topic/presence', (message) => {
         const update: UserPresence = JSON.parse(message.body);
         this.updateUserPresence(update);
+        this.presenceBroadcastSubject.next(update);
       });
     }
   }
@@ -40,10 +44,19 @@ export class PresenceService {
   private updateUserPresence(presence: UserPresence) {
     const currentPresence = this.presenceSubject.value;
     currentPresence.set(presence.userId, presence);
-    this.presenceSubject.next(new Map(currentPresence));
+    const newMap = new Map(currentPresence);
+    this.presenceSubject.next(newMap);
   }
 
-  private updateStatus(status: 'AWAY' | 'ONLINE') {
+  private updateStatus(status: 'AWAY' | 'ONLINE' | 'OFFLINE') {
+    const userId = this.tokenService.getUserId();
+    if (userId) {
+      this.updateUserPresence({
+        userId: parseInt(userId),
+        status: status === 'AWAY' ? 'OFFLINE' : status,
+        lastSeen: new Date().toISOString()
+      });
+    }
     if (this.stompClient?.connected) {
       this.stompClient.publish({
         destination: '/app/presence.update',
@@ -86,6 +99,10 @@ export class PresenceService {
     if (diffMins < 60) return `last seen ${diffMins} minutes ago`;
     if (diffMins < 1440) return `last seen ${Math.floor(diffMins / 60)} hours ago`;
     return `last seen ${Math.floor(diffMins / 1440)} days ago`;
+  }
+
+  goOffline() {
+    this.updateStatus('OFFLINE');
   }
 
   destroy() {

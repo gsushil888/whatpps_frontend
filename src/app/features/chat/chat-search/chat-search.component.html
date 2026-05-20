@@ -6,6 +6,11 @@
     <div class="flex items-center gap-2">
       <button
         class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
+        (click)="openGlobalSearch()" title="Search">
+        <i class="fas fa-search text-lg"></i>
+      </button>
+      <button
+        class="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
         (click)="openNewChat()">
         <i class="fas fa-comment-medical text-lg"></i>
       </button>
@@ -39,34 +44,148 @@
   </div>
 
   <!-- Search bar -->
-  <div class="px-3 pb-3 relative">
+  <div class="px-3 pb-3">
     <div class="relative">
-      <input type="text" placeholder="Search or start new chat"
+      <input type="text" placeholder="Search chats"
         class="w-full px-4 py-2 pl-10 bg-gray-100 dark:bg-gray-700 rounded-lg outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:bg-white dark:focus:bg-gray-600 border border-transparent focus:border-gray-300 dark:focus:border-gray-500"
-        [(ngModel)]="searchTerm" (input)="onSearch()" (focus)="onSearchFocus()" (blur)="hideContacts()" />
+        [(ngModel)]="searchTerm" (input)="onSearch()" />
       <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500"></i>
-    </div>
-
-    <div *ngIf="showContacts && searchTerm"
-      class="absolute z-50 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto left-0 right-0">
-      <div class="p-2 text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">Contacts</div>
-      <div *ngFor="let contact of filteredContacts"
-        class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
-        (mousedown)="startChatWithContact(contact)">
-        <img [src]="contact.profilePictureUrl || 'assets/google.svg'" class="w-10 h-10 rounded-full" alt="avatar" />
-        <div>
-          <p class="font-medium text-sm text-gray-900 dark:text-gray-100">{{ contact.displayName }}</p>
-          <p class="text-xs text-gray-500 dark:text-gray-400">{{ contact.phoneNumber }}</p>
-        </div>
-      </div>
-      <div *ngIf="filteredContacts.length === 0" class="p-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-        No contacts found
-      </div>
+      <button *ngIf="searchTerm" (click)="clearSearch()"
+        class="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+        <i class="fas fa-times text-xs"></i>
+      </button>
     </div>
   </div>
 </div>
 
-<!-- Add Contact Modal -->
+<!-- Global Search Overlay -->
+<div *ngIf="showGlobalSearch"
+  class="fixed inset-0 z-[100] bg-black bg-opacity-40 flex items-start justify-center pt-0"
+  (click)="closeGlobalSearch()">
+  <div class="w-full max-w-md bg-white dark:bg-gray-800 shadow-2xl flex flex-col"
+    style="height: 100vh; max-height: 100vh;"
+    (click)="$event.stopPropagation()">
+
+    <!-- Search Input Header -->
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+      <button (click)="closeGlobalSearch()" class="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+      <input #globalSearchInput type="text" placeholder="Search contacts, chats, messages..."
+        class="flex-1 bg-transparent outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400"
+        [(ngModel)]="globalQuery" (input)="onGlobalSearch()" />
+      <button *ngIf="globalQuery" (click)="clearGlobalSearch()" class="text-gray-400 hover:text-gray-600">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+
+    <!-- Results -->
+    <div class="flex-1 overflow-y-auto">
+
+      <!-- Loading -->
+      <div *ngIf="isSearching" class="flex justify-center py-8">
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-green-500"></div>
+      </div>
+
+      <!-- Empty state -->
+      <div *ngIf="!isSearching && globalQuery && !hasResults"
+        class="flex flex-col items-center justify-center py-16 text-gray-400">
+        <i class="fas fa-search text-4xl mb-3"></i>
+        <p class="text-sm">No results for "{{ globalQuery }}"</p>
+      </div>
+
+      <!-- Placeholder -->
+      <div *ngIf="!globalQuery"
+        class="flex flex-col items-center justify-center py-16 text-gray-400">
+        <i class="fas fa-search text-4xl mb-3"></i>
+        <p class="text-sm">Search for people, chats or messages</p>
+      </div>
+
+      <ng-container *ngIf="!isSearching && searchResults">
+
+        <!-- Contacts -->
+        <div *ngIf="searchResults.contacts?.length">
+          <div class="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-50 dark:bg-gray-700">
+            Contacts
+          </div>
+          <div *ngFor="let c of searchResults.contacts"
+            class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700"
+            (click)="openConversationFromContact(c)">
+            <div class="relative">
+              <img [src]="c.contactUser.profilePictureUrl || 'assets/google.svg'" class="w-10 h-10 rounded-full object-cover" />
+              <span *ngIf="c.contactUser.isOnline"
+                class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{{ c.displayName }}</p>
+              <p class="text-xs text-gray-500 truncate">{{ c.contactUser.displayName }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conversations -->
+        <div *ngIf="searchResults.conversations?.length">
+          <div class="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-50 dark:bg-gray-700">
+            Chats
+          </div>
+          <div *ngFor="let conv of searchResults.conversations"
+            class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700"
+            (click)="openConversation(conv.id)">
+            <img [src]="conv.profileImageUrl || 'assets/google.svg'" class="w-10 h-10 rounded-full object-cover" />
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{{ conv.name }}</p>
+              <p class="text-xs text-gray-500 truncate">{{ conv.lastMessage?.content }}</p>
+            </div>
+            <span class="text-xs text-gray-400 flex-shrink-0">{{ conv.conversationType }}</span>
+          </div>
+        </div>
+
+        <!-- Messages -->
+        <div *ngIf="searchResults.messages?.length">
+          <div class="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-50 dark:bg-gray-700">
+            Messages
+          </div>
+          <div *ngFor="let msg of searchResults.messages"
+            class="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700"
+            (click)="openConversation(msg.conversation.id)">
+            <div class="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-comment text-gray-400 text-sm"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <p class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{{ msg.conversation.name }}</p>
+                <span class="text-xs text-gray-400 flex-shrink-0 ml-2">{{ msg.timestamp | date:'shortTime' }}</span>
+              </div>
+              <p class="text-xs text-gray-500 truncate"><span class="font-medium">{{ msg.sender.displayName }}:</span> {{ msg.content }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Users -->
+        <div *ngIf="searchResults.users?.length">
+          <div class="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide bg-gray-50 dark:bg-gray-700">
+            People
+          </div>
+          <div *ngFor="let u of searchResults.users"
+            class="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700">
+            <div class="relative">
+              <img [src]="u.profilePictureUrl || 'assets/google.svg'" class="w-10 h-10 rounded-full object-cover" />
+              <span *ngIf="u.isOnline"
+                class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">{{ u.displayName }}</p>
+              <p class="text-xs text-gray-500 truncate">@{{ u.username }}</p>
+            </div>
+          </div>
+        </div>
+
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+
 <div *ngIf="showAddContactModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
   (click)="closeAddContactModal()">
   <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6" (click)="$event.stopPropagation()">
