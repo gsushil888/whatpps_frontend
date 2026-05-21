@@ -1,7 +1,7 @@
-import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
+import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
-import { takeUntil } from 'rxjs/operators';
 import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 import { ChatService } from '../../chat/services/chat.service';
 import { WebSocketService } from '../../chat/services/websocket.service';
 
@@ -22,11 +22,15 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
+    console.log("Home layout constructing....")
+    console.log("Connecting to Websocket...")
+
     this.webSocketService.connect();
 
     this.chatService.selectedChatId$
       .pipe(takeUntil(this.destroy$))
       .subscribe(id => {
+        console.log("Selected Conversation Id in Home layout => ", id)
         this.selectedChatId = id;
         this.updateBottomNav();
       });
