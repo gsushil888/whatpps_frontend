@@ -23,6 +23,10 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   showAttachmentModal = false;
   showChatInfo = false;
   showMenuModal = false;
+  showSearch = false;
+  showMore = false;
+  searchQuery = '';
+  searchResultCount = 0;
   showImageModal = false;
   selectedImage: string = '';
   activeFilter: string = 'all';
@@ -201,15 +205,18 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   getChatOnlineStatus(): string {
     if (!this.currentChat || this.currentChat.type === 'GROUP') return '';
     if (this.currentChat.otherUserId) {
-      return this.presenceService.getLastSeen(this.currentChat.otherUserId) ||
-        (this.currentChat.isOnline ? 'online' : this.getStaticLastSeen());
+      const presence = this.presenceService.getUserPresence(this.currentChat.otherUserId);
+      console.log('[ChatWindow] getChatOnlineStatus for userId', this.currentChat.otherUserId, ':', presence);
+      const lastSeen = this.presenceService.getLastSeen(this.currentChat.otherUserId);
+      if (lastSeen) return lastSeen;
     }
     return this.currentChat.isOnline ? 'online' : this.getStaticLastSeen();
   }
 
   isCurrentChatOnline(): boolean {
     if (this.currentChat?.otherUserId) {
-      return this.presenceService.isUserOnline(this.currentChat.otherUserId);
+      const presence = this.presenceService.getUserPresence(this.currentChat.otherUserId);
+      if (presence) return presence.status === 'ONLINE';
     }
     return this.currentChat?.isOnline === true;
   }
@@ -632,13 +639,45 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     this.showChatInfo = false;
   }
 
+  get filteredMessages(): ConversationMessage[] {
+    if (!this.searchQuery.trim()) return this.messages;
+    const q = this.searchQuery.toLowerCase();
+    const results = this.messages.filter(m => m.content?.toLowerCase().includes(q));
+    this.searchResultCount = results.length;
+    return results;
+  }
+
   // ---------------------- Menu Modal ----------------------
   toggleMenuModal() {
     this.showMenuModal = !this.showMenuModal;
+    this.showMore = false;
   }
 
   closeMenuModal() {
     this.showMenuModal = false;
+    this.showMore = false;
+  }
+
+  toggleMore() {
+    this.showMore = !this.showMore;
+  }
+
+  viewContact() {
+    this.showMenuModal = false;
+    this.showChatInfo = true;
+  }
+
+  openSearch() {
+    this.showMenuModal = false;
+    this.showSearch = true;
+    this.searchQuery = '';
+    this.searchResultCount = 0;
+  }
+
+  closeSearch() {
+    this.showSearch = false;
+    this.searchQuery = '';
+    this.searchResultCount = 0;
   }
 
   deleteChat() {

@@ -1,14 +1,12 @@
 <div class="flex flex-col h-full" *ngIf="chatDetail">
+
   <!-- Header -->
   <div
-    class="h-16 px-4 flex items-center gap-4 border-b bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600"
-  >
-    <button
-      class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
-      (click)="onClose()"
-    >
+    class="h-16 px-4 flex items-center gap-4 border-b bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
+    <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors" (click)="onClose()">
       <i class="fas fa-arrow-left text-gray-700 dark:text-gray-300"></i>
     </button>
+
     <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
       {{ chatDetail.type === "GROUP" ? "Group" : "Contact" }} Info
     </h2>
@@ -16,47 +14,50 @@
 
   <!-- Scrollable Content -->
   <div
-    class="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500"
-  >
+    class="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent hover:scrollbar-thumb-gray-400 dark:hover:scrollbar-thumb-gray-500">
+
     <!-- Profile Section -->
     <div class="bg-gray-50 dark:bg-gray-700 p-6 text-center">
-      <img
-        [src]="
+
+      <img [src]="
           chatDetail.groupPictureUrl ||
           (chatDetail.participants[0] &&
             chatDetail.participants[0].profilePictureUrl) ||
           'assets/google.svg'
-        "
-        class="w-32 h-32 rounded-full mx-auto object-cover mb-4"
-        alt="profile"
-      />
+        " class="w-32 h-32 rounded-full mx-auto object-cover mb-4" alt="profile" />
+
       <h3 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-1">
         {{ chatDetail.title }}
       </h3>
-      <div
-        *ngIf="chatDetail.type === 'INDIVIDUAL' && chatDetail.participants[0]"
-      >
+
+      <!-- Individual -->
+      <div *ngIf="
+          chatDetail.type === 'INDIVIDUAL' &&
+          chatDetail.participants[0]
+        ">
+
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-0.5">
           {{ chatDetail.participants[0].displayName }}
         </p>
+
         <p class="text-sm text-gray-500 dark:text-gray-400">
           {{ chatDetail.participants[0].mobileNumber }}
         </p>
       </div>
-      <p
-        class="text-sm text-gray-600 dark:text-gray-400"
-        *ngIf="chatDetail.type === 'GROUP'"
-      >
+
+      <!-- Group -->
+      <p class="text-sm text-gray-600 dark:text-gray-400" *ngIf="chatDetail.type === 'GROUP'">
         Group · {{ chatDetail.participants.length }} participants
       </p>
     </div>
 
-    <!-- Description (for groups) -->
-    <div
-      class="p-4 border-b dark:border-gray-700"
-      *ngIf="chatDetail.description"
-    >
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Description</p>
+    <!-- Description -->
+    <div class="p-4 border-b dark:border-gray-700" *ngIf="chatDetail.description">
+
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+        Description
+      </p>
+
       <p class="text-sm text-gray-900 dark:text-gray-100">
         {{ chatDetail.description }}
       </p>
@@ -64,253 +65,387 @@
 
     <!-- Action Buttons -->
     <div class="flex justify-center gap-8 py-6 border-b dark:border-gray-700">
-      <button
-        class="flex flex-col items-center gap-2 text-gray-700 dark:text-gray-300"
-      >
-        <div
-          class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center"
-        >
+
+      <!-- Audio -->
+      <button class="flex flex-col items-center gap-2 text-gray-700 dark:text-gray-300">
+        <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
           <i class="fas fa-phone text-green-600 dark:text-green-400"></i>
         </div>
+
         <span class="text-xs">Audio</span>
       </button>
-      <button
-        class="flex flex-col items-center gap-2 text-gray-700 dark:text-gray-300"
-      >
-        <div
-          class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center"
-        >
+
+      <!-- Video -->
+      <button class="flex flex-col items-center gap-2 text-gray-700 dark:text-gray-300">
+        <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
           <i class="fas fa-video text-green-600 dark:text-green-400"></i>
         </div>
+
         <span class="text-xs">Video</span>
       </button>
-      <button
-        class="flex flex-col items-center gap-2 text-gray-700 dark:text-gray-300"
-      >
-        <div
-          class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center"
-        >
+
+      <!-- Search -->
+      <button class="flex flex-col items-center gap-2 text-gray-700 dark:text-gray-300">
+        <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
           <i class="fas fa-search text-green-600 dark:text-green-400"></i>
         </div>
+
         <span class="text-xs">Search</span>
       </button>
     </div>
 
-    <!-- Participants (for groups) -->
-    <div
-      class="p-4 border-b dark:border-gray-700"
-      *ngIf="chatDetail.type === 'GROUP'"
-    >
+    <!-- Participants -->
+    <div class="p-4 border-b dark:border-gray-700" *ngIf="chatDetail.type === 'GROUP'">
+
+      <!-- Add Participant Button -->
+      <div class="mb-4">
+
+        <button
+          class="flex items-center justify-center gap-2 px-4 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+          (click)="openAddParticipantsModal()">
+
+          <i class="fas fa-user-plus"></i>
+
+          <span>Add Participants</span>
+        </button>
+      </div>
+
+      <!-- Count -->
       <p class="text-sm text-gray-900 dark:text-gray-100 mb-3">
         {{ chatDetail.participants.length }} participants
       </p>
-      <div
-        *ngFor="let participant of chatDetail.participants"
-        class="flex items-center gap-3 py-2"
-      >
-        <img
-          [src]="participant.profilePictureUrl || 'assets/google.svg'"
-          class="w-10 h-10 rounded-full object-cover"
-          alt="participant"
-        />
+
+      <!-- Participant List -->
+      <div *ngFor="let participant of getSortedParticipants()" class="flex items-center gap-3 py-2">
+
+        <!-- Avatar -->
+        <img [src]="participant.profilePictureUrl || 'assets/google.svg'" class="w-10 h-10 rounded-full object-cover"
+          alt="participant" />
+
+        <!-- Details -->
         <div class="flex-1">
+
+          <!-- Name -->
           <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {{ participant.displayName }}
+
+            {{
+            participant.userId === currentUserId
+            ? 'You'
+            : participant.displayName
+            }}
           </p>
+
+          <!-- Number -->
           <p class="text-xs text-gray-500 dark:text-gray-400">
             {{ participant.mobileNumber }}
           </p>
         </div>
+
+        <!-- Right Section -->
         <div class="flex items-center gap-2">
-          <span
-            *ngIf="participant.participantRole === 'ADMIN'"
-            class="text-xs text-green-600 dark:text-green-400 font-medium"
-          >
+
+          <!-- Admin -->
+          <span *ngIf="participant.participantRole === 'ADMIN'"
+            class="text-xs text-green-600 dark:text-green-400 font-medium">
             Admin
           </span>
-          <span
-            *ngIf="participant.isOnline"
-            class="w-2 h-2 bg-green-500 rounded-full"
-          ></span>
+
+          <!-- Online -->
+          <span *ngIf="participant.isOnline" class="w-2 h-2 bg-green-500 rounded-full"></span>
+
+          <!-- Remove -->
+          <button *ngIf="
+              participant.userId !== currentUserId &&
+              participant.participantRole !== 'ADMIN'
+            "
+            class="w-8 h-8 rounded-full hover:bg-red-100 dark:hover:bg-red-900/30 flex items-center justify-center transition-colors"
+            [disabled]="isRemovingParticipant(participant.userId)" (click)="removeParticipant(participant)">
+
+            <!-- Normal -->
+            <i *ngIf="!isRemovingParticipant(participant.userId)" class="fas fa-user-minus text-red-500 text-sm"></i>
+
+            <!-- Loading -->
+            <i *ngIf="isRemovingParticipant(participant.userId)"
+              class="fas fa-spinner fa-spin text-red-500 text-sm"></i>
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Media Section -->
     <div class="p-4 border-b dark:border-gray-700">
+
       <p class="text-sm text-gray-900 dark:text-gray-100 mb-2">
         Media, links and docs
       </p>
-      <div class="flex flex-wrap gap-1" *ngIf="chatDetail.media && chatDetail.media.length > 0">
-        <div
-          *ngFor="let item of chatDetail.media.slice(0, 10)"
+
+      <div class="flex flex-wrap gap-1" *ngIf="
+          chatDetail.media &&
+          chatDetail.media.length > 0
+        ">
+
+        <div *ngFor="let item of chatDetail.media.slice(0, 10)"
           class="w-20 h-20 bg-gray-200 dark:bg-gray-600 rounded overflow-hidden cursor-pointer flex-shrink-0"
-          (click)="openMediaModal(item)"
-        >
-          <img
-            *ngIf="item.type === 'IMAGE'"
-            [src]="item.thumbnailUrl || item.url"
-            class="w-full h-full object-cover"
-            [alt]="item.fileName"
-          />
+          (click)="openMediaModal(item)">
+
+          <!-- IMAGE -->
+          <img *ngIf="item.type === 'IMAGE'" [src]="item.thumbnailUrl || item.url" class="w-full h-full object-cover"
+            [alt]="item.fileName" />
+
+          <!-- VIDEO -->
           <div *ngIf="item.type === 'VIDEO'" class="relative w-full h-full">
-            <img
-              [src]="item.thumbnailUrl"
-              class="w-full h-full object-cover"
-              [alt]="item.fileName"
-            />
+
+            <img [src]="item.thumbnailUrl" class="w-full h-full object-cover" [alt]="item.fileName" />
+
             <i
-              class="fas fa-play-circle absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-2xl"
-            ></i>
+              class="fas fa-play-circle absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-2xl"></i>
           </div>
-          <div
-            *ngIf="item.type === 'DOCUMENT'"
-            class="flex items-center justify-center w-full h-full bg-gray-300 dark:bg-gray-500"
-          >
+
+          <!-- DOCUMENT -->
+          <div *ngIf="item.type === 'DOCUMENT'"
+            class="flex items-center justify-center w-full h-full bg-gray-300 dark:bg-gray-500">
             <i class="fas fa-file text-gray-600 dark:text-gray-300 text-2xl"></i>
           </div>
         </div>
-        <button
-          *ngIf="chatDetail.media.length > 10"
+
+        <!-- More -->
+        <button *ngIf="chatDetail.media.length > 10"
           class="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center flex-shrink-0 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          (click)="openAllMedia()"
-        >
+          (click)="openAllMedia()">
           <i class="fas fa-chevron-right text-gray-600 dark:text-gray-400 text-xl"></i>
         </button>
       </div>
-      <p
-        *ngIf="!chatDetail.media || chatDetail.media.length === 0"
-        class="text-xs text-gray-500 dark:text-gray-400"
-      >
+
+      <!-- Empty -->
+      <p *ngIf="
+          !chatDetail.media ||
+          chatDetail.media.length === 0
+        " class="text-xs text-gray-500 dark:text-gray-400">
         No media yet
       </p>
     </div>
 
     <!-- Options -->
     <div class="py-2">
+
+      <!-- Mute -->
       <button
-        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
-        <i
-          class="fas fa-bell"
-          [class.text-gray-600]="!chatDetail.settings.isMuted"
+        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
+        <i class="fas fa-bell" [class.text-gray-600]="!chatDetail.settings.isMuted"
           [class.text-red-600]="chatDetail.settings.isMuted"
-          [class.dark:text-gray-400]="!chatDetail.settings.isMuted"
-        ></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100"
-          >{{
-            chatDetail.settings.isMuted ? "Unmute" : "Mute"
+          [class.dark:text-gray-400]="!chatDetail.settings.isMuted"></i>
+
+        <span class="text-sm text-gray-900 dark:text-gray-100">
+          {{
+          chatDetail.settings.isMuted
+          ? "Unmute"
+          : "Mute"
           }}
-          notifications</span
-        >
+          notifications
+        </span>
       </button>
+
+      <!-- Disappearing -->
       <button
-        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
+        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
         <i class="fas fa-image text-gray-600 dark:text-gray-400"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100"
-          >Disappearing messages</span
-        >
+
+        <span class="text-sm text-gray-900 dark:text-gray-100">
+          Disappearing messages
+        </span>
       </button>
+
+      <!-- Encryption -->
       <button
-        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
+        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
         <i class="fas fa-lock text-gray-600 dark:text-gray-400"></i>
-        <span class="text-sm text-gray-900 dark:text-gray-100">Encryption</span>
+
+        <span class="text-sm text-gray-900 dark:text-gray-100">
+          Encryption
+        </span>
       </button>
     </div>
 
     <!-- Danger Zone -->
     <div class="py-2 border-t dark:border-gray-700">
+
+      <!-- Block -->
       <button
-        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
+        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
         <i class="fas fa-ban text-red-600"></i>
-        <span class="text-sm text-red-600">Block</span>
+
+        <span class="text-sm text-red-600">
+          Block
+        </span>
       </button>
+
+      <!-- Report -->
       <button
-        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
+        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
         <i class="fas fa-thumbs-down text-red-600"></i>
-        <span class="text-sm text-red-600"
-          >Report {{ chatDetail.type === "GROUP" ? "group" : "contact" }}</span
-        >
+
+        <span class="text-sm text-red-600">
+          Report
+          {{ chatDetail.type === "GROUP" ? "group" : "contact" }}
+        </span>
       </button>
+
+      <!-- Delete -->
       <button
-        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-      >
+        class="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
         <i class="fas fa-trash text-red-600"></i>
-        <span class="text-sm text-red-600">Delete chat</span>
+
+        <span class="text-sm text-red-600">
+          Delete chat
+        </span>
       </button>
     </div>
   </div>
 
+  <!-- ADD PARTICIPANTS MODAL -->
+  <div *ngIf="showAddParticipantsModal"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+    (click)="closeAddParticipantsModal()">
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md max-h-[80vh] flex flex-col"
+      (click)="$event.stopPropagation()">
+
+      <!-- Header -->
+      <div class="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
+
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          Add Participants
+        </h2>
+
+        <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
+          (click)="closeAddParticipantsModal()">
+
+          <i class="fas fa-times text-gray-700 dark:text-gray-300"></i>
+        </button>
+      </div>
+
+      <!-- Contacts -->
+      <div class="flex-1 overflow-y-auto">
+
+        <div *ngFor="let contact of availableContacts"
+          class="flex items-center gap-3 px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+          (click)="toggleParticipant(contact)">
+
+          <!-- Checkbox -->
+          <input type="checkbox" [checked]="selectedParticipantIds.includes(contact.contactUserId)" class="w-4 h-4" />
+
+          <!-- Avatar -->
+          <img [src]="contact.profilePictureUrl || 'assets/google.svg'" class="w-10 h-10 rounded-full object-cover" />
+
+          <!-- Details -->
+          <div class="flex-1">
+
+            <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {{ contact.displayName }}
+            </p>
+
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ contact.phoneNumber }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Empty -->
+        <div *ngIf="availableContacts.length === 0" class="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          No contacts available
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-4 border-t dark:border-gray-700">
+
+        <button
+          class="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg transition-colors disabled:opacity-50"
+          [disabled]="
+            selectedParticipantIds.length === 0 ||
+            addingParticipants
+          " (click)="addParticipants()">
+
+          {{
+          addingParticipants
+          ? 'Adding Participants...'
+          : 'Add Participants'
+          }}
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Media Modal -->
-  <div
-    *ngIf="selectedMedia"
-    class="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center p-8"
-    (click)="closeMediaModal()"
-  >
+  <div *ngIf="selectedMedia" class="fixed inset-0 bg-black bg-opacity-95 z-50 flex items-center justify-center p-8"
+    (click)="closeMediaModal()">
+
     <div class="relative" (click)="$event.stopPropagation()">
-      <img
-        *ngIf="selectedMedia.type === 'IMAGE'"
-        [src]="selectedMedia.url"
-        class="max-w-[600px] max-h-[600px] object-contain rounded-lg shadow-2xl"
-      />
+
+      <img *ngIf="selectedMedia.type === 'IMAGE'" [src]="selectedMedia.url"
+        class="max-w-[600px] max-h-[600px] object-contain rounded-lg shadow-2xl" />
+
       <button
         class="absolute -top-12 -right-12 w-10 h-10 bg-white bg-opacity-20 hover:bg-opacity-30 rounded-full flex items-center justify-center text-white text-xl transition-colors"
-        (click)="closeMediaModal()"
-      >
+        (click)="closeMediaModal()">
+
         <i class="fas fa-times"></i>
       </button>
     </div>
   </div>
 
   <!-- All Media Modal -->
-  <div
-    *ngIf="showAllMedia"
-    class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
-    (click)="closeAllMedia()"
-  >
-    <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col" (click)="$event.stopPropagation()">
+  <div *ngIf="showAllMedia" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+    (click)="closeAllMedia()">
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-2xl max-h-[80vh] flex flex-col"
+      (click)="$event.stopPropagation()">
+
+      <!-- Header -->
       <div class="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
+
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Media ({{ chatDetail.media.length }})
         </h2>
-        <button
-          class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
-          (click)="closeAllMedia()"
-        >
+
+        <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
+          (click)="closeAllMedia()">
+
           <i class="fas fa-times text-gray-700 dark:text-gray-300"></i>
         </button>
       </div>
+
+      <!-- Body -->
       <div class="flex-1 overflow-y-auto p-4">
+
         <div class="grid grid-cols-3 gap-2">
-          <div
-            *ngFor="let item of chatDetail.media.slice(0, 10)"
+
+          <div *ngFor="let item of chatDetail.media.slice(0, 10)"
             class="aspect-square bg-gray-200 dark:bg-gray-600 rounded overflow-hidden cursor-pointer"
-            (click)="openMediaModal(item); closeAllMedia()"
-          >
-            <img
-              *ngIf="item.type === 'IMAGE'"
-              [src]="item.thumbnailUrl || item.url"
-              class="w-full h-full object-cover"
-              [alt]="item.fileName"
-            />
+            (click)="openMediaModal(item); closeAllMedia()">
+
+            <!-- IMAGE -->
+            <img *ngIf="item.type === 'IMAGE'" [src]="item.thumbnailUrl || item.url" class="w-full h-full object-cover"
+              [alt]="item.fileName" />
+
+            <!-- VIDEO -->
             <div *ngIf="item.type === 'VIDEO'" class="relative w-full h-full">
-              <img
-                [src]="item.thumbnailUrl"
-                class="w-full h-full object-cover"
-                [alt]="item.fileName"
-              />
+
+              <img [src]="item.thumbnailUrl" class="w-full h-full object-cover" [alt]="item.fileName" />
+
               <i
-                class="fas fa-play-circle absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-3xl"
-              ></i>
+                class="fas fa-play-circle absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-3xl"></i>
             </div>
-            <div
-              *ngIf="item.type === 'DOCUMENT'"
-              class="flex items-center justify-center w-full h-full bg-gray-300 dark:bg-gray-500"
-            >
+
+            <!-- DOCUMENT -->
+            <div *ngIf="item.type === 'DOCUMENT'"
+              class="flex items-center justify-center w-full h-full bg-gray-300 dark:bg-gray-500">
               <i class="fas fa-file text-gray-600 dark:text-gray-300 text-3xl"></i>
             </div>
           </div>

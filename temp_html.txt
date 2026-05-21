@@ -1,7 +1,6 @@
 <div class="bg-white dark:bg-gray-800">
   <!-- Filters -->
   <div class="flex gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-hide">
-    <!--[ALL,FAVOURITE,ARCHIEVED] -->
     <button *ngFor="let filter of filters" (click)="selectFilter(filter)"
       class="px-3 py-1 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
       [class.bg-green-500]="activeFilter === filter" [class.text-white]="activeFilter === filter"
@@ -9,7 +8,6 @@
       [class.text-gray-700]="activeFilter !== filter" [class.dark:text-gray-300]="activeFilter !== filter">
       {{ filter }}
     </button>
-    <!--[CONTACT] -->
     <button (click)="showContactsList()"
       class="px-3 py-1 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
       [class.bg-green-500]="showContacts" [class.text-white]="showContacts" [class.bg-gray-100]="!showContacts"
@@ -17,7 +15,6 @@
       [class.dark:text-gray-300]="!showContacts">
       Contacts
     </button>
-    <!--[SHOW CREATE GROUP] -->
     <button (click)="showCreateGroupView()"
       class="px-3 py-1 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
       [class.bg-green-500]="showCreateGroup" [class.text-white]="showCreateGroup" [class.bg-gray-100]="!showCreateGroup"
@@ -29,14 +26,13 @@
 
   <!-- Conversations List -->
   <div *ngIf="!showContacts && !showCreateGroup">
-    <div *ngFor="let chat of filteredChats"
+    <div *ngFor="let chat of chats"
       class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       (click)="selectChat(chat.id)" [class.bg-green-50]="chat.id === selectedChatId"
       [class.dark:bg-green-900]="chat.id === selectedChatId" [class.border-l-4]="chat.id === selectedChatId"
       [class.border-l-green-500]="chat.id === selectedChatId">
       <div class="relative">
-        <img [src]="chat.avatar" class="w-12 h-12 rounded-full object-cover cursor-pointer" alt="avatar"
-          (click)="openAvatarModal(chat.avatar, $event)" />
+        <img [src]="chat.avatar" class="w-12 h-12 rounded-full object-cover cursor-pointer" alt="avatar" (click)="openAvatarModal(chat.avatar, $event)" />
         <div *ngIf="isUserOnline(chat)"
           class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white dark:border-gray-800">
         </div>
@@ -62,11 +58,10 @@
             <p class="text-sm text-gray-600 dark:text-gray-300 truncate min-w-0 flex-1">
               <!-- Group chat: show sender first name as prefix -->
               <span *ngIf="chat.type === 'GROUP' && chat.lastMessageSenderName" class="text-gray-500 font-medium">
-                {{ chat.lastMessageSenderId === currentUserId ? 'You' : chat.lastMessageSenderName.split(' ')[0] }}:
+                {{ chat.lastMessageSenderId === currentUserId ? 'You' : chat.lastMessageSenderName.split(' ')[0] }}: 
               </span>
               <!-- Individual chat: show 'You:' only if current user sent it -->
-              <span *ngIf="chat.type !== 'GROUP' && chat.lastMessageSenderId === currentUserId"
-                class="text-gray-500">You: </span>
+              <span *ngIf="chat.type !== 'GROUP' && chat.lastMessageSenderId === currentUserId" class="text-gray-500">You: </span>
               <span *ngIf="chat.lastMessageType !== 'TEXT'" class="text-gray-500">
                 {{ getMediaTypeLabel(chat.lastMessageType || 'TEXT') }}
               </span>
@@ -88,24 +83,22 @@
       </div>
     </div>
 
-    <!-- Profile Image Modal -->
-    <div *ngIf="selectedAvatarUrl" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80"
-      (click)="closeAvatarModal()">
-      <img [src]="selectedAvatarUrl" class="max-w-xs max-h-[80vh] rounded-xl object-contain"
-        (click)="$event.stopPropagation()" />
-    </div>
+  <!-- Profile Image Modal -->
+  <div *ngIf="selectedAvatarUrl" class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-80" (click)="closeAvatarModal()">
+    <img [src]="selectedAvatarUrl" class="max-w-xs max-h-[80vh] rounded-xl object-contain" (click)="$event.stopPropagation()" />
+  </div>
 
-    <div *ngIf="filteredChats.length === 0"
+    <div *ngIf="chats.length === 0"
       class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
       <i class="fas fa-comments text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
-      <p class="text-lg font-medium">{{ listFilter ? 'No chats found' : 'No chats yet' }}</p>
-      <p class="text-sm">{{ listFilter ? 'Try a different search term' : 'Search for contacts to start chatting' }}</p>
+      <p class="text-lg font-medium">No chats yet</p>
+      <p class="text-sm">Search for contacts to start chatting</p>
     </div>
   </div>
 
   <!-- Contacts List -->
   <div *ngIf="showContacts && !showCreateGroup">
-    <div *ngFor="let contact of filteredContacts"
+    <div *ngFor="let contact of contacts"
       class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
       (click)="selectContact(contact)">
       <div class="relative">
@@ -126,11 +119,11 @@
       </div>
     </div>
 
-    <div *ngIf="filteredContacts.length === 0"
+    <div *ngIf="contacts.length === 0"
       class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
       <i class="fas fa-address-book text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
-      <p class="text-lg font-medium">{{ listFilter ? 'No contacts found' : 'No contacts yet' }}</p>
-      <p class="text-sm">{{ listFilter ? 'Try a different search term' : 'Add contacts to start chatting' }}</p>
+      <p class="text-lg font-medium">No contacts yet</p>
+      <p class="text-sm">Add contacts to start chatting</p>
     </div>
   </div>
 

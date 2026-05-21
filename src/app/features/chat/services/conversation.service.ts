@@ -1,8 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from 'src/environments/environment';
 import { TokenService } from 'src/app/core/services/token.service';
+import { environment } from 'src/environments/environment';
 
 export interface ConversationResponse {
   success: boolean;
@@ -44,6 +44,7 @@ export interface Conversation {
   isOnline?: boolean | null;
   lastActiveAt?: string | null;
   participants?: Participant[];
+  otherUserId?: number;
 }
 
 export interface MessageResponse {
@@ -225,5 +226,21 @@ export class ConversationService {
   removeReaction(messageId: number, emoji: string): Observable<any> {
     const url = `${environment.apiBaseUrl}messages/${messageId}/reactions/${encodeURIComponent(emoji)}`;
     return this.http.delete(url, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  addParticipants(conversationId: number, payload: any) {
+    return this.http.post(
+      `${environment.apiBaseUrl}conversations/${conversationId}/participants`,
+      payload
+    );
+  }
+
+  removeParticipant(
+    conversationId: number,
+    participantId: number
+  ) {
+    return this.http.delete(
+      `${environment.apiBaseUrl}conversations/${conversationId}/participants/${participantId}`
+    );
   }
 }

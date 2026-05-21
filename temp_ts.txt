@@ -1,34 +1,27 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { PresenceService } from 'src/app/core/services/presence.service';
-import { TokenService } from 'src/app/core/services/token.service';
 import { Chat, ChatService } from '../services/chat.service';
 import { Contact, ContactService } from '../services/contact.service';
 import { ConversationService } from '../services/conversation.service';
+import { PresenceService } from 'src/app/core/services/presence.service';
+import { TokenService } from 'src/app/core/services/token.service';
 
 @Component({
   selector: 'app-chat-list',
   templateUrl: './chat-list.component.html'
 })
 export class ChatListComponent implements OnInit, OnDestroy {
-
-  currentUserId: number = 0;
-
   chats: Chat[] = [];
-  filteredChats: Chat[] = [];
-  selectedChatId: string | null = null;
-
   contacts: Contact[] = [];
-  selectedContacts: Contact[] = [];
-  filteredContacts: Contact[] = [];
-  showContacts = false;
-  showCreateGroup = false;
-
-  listFilter = '';
+  selectedChatId: string | null = null;
+  currentUserId: number = 0;
+  private destroy$ = new Subject<void>();
   filters = ['All', 'Favourite', 'Archived'];
   activeFilter = 'All';
-
+  showContacts = false;
+  showCreateGroup = false;
+  selectedContacts: Contact[] = [];
   searchTerm = '';
   groupName = '';
   groupDescription = '';
@@ -37,8 +30,6 @@ export class ChatListComponent implements OnInit, OnDestroy {
   groupImageFile: File | null = null;
   groupImagePreview: string | null = null;
   selectedAvatarUrl: string | null = null;
-
-  private destroy$ = new Subject<void>();
 
   constructor(
     private chatService: ChatService,
@@ -50,21 +41,13 @@ export class ChatListComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
-    console.log("Constructing chat list......");
     this.currentUserId = parseInt(this.tokenService.getUserId() || '0');
 
     this.chatService.chats$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(chats => {
       this.chats = chats;
-      this.applyFilter();
-    });
-
-    this.chatService.listFilter$.pipe(
-      takeUntil(this.destroy$)
-    ).subscribe(term => {
-      this.listFilter = term;
-      this.applyFilter();
+      console.log('Chats loaded:', this.chats);
     });
 
     this.chatService.selectedChatId$.pipe(
@@ -85,22 +68,6 @@ export class ChatListComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  applyFilter() {
-    const q = this.listFilter.toLowerCase().trim();
-    this.filteredChats = q
-      ? this.chats.filter(c =>
-        c.name.toLowerCase().includes(q) ||
-        (c.lastMessage || '').toLowerCase().includes(q)
-      )
-      : this.chats;
-    this.filteredContacts = q
-      ? this.contacts.filter(c =>
-        c.displayName.toLowerCase().includes(q) ||
-        c.phoneNumber.includes(q)
-      )
-      : this.contacts;
   }
 
   selectChat(chatId: string) {
@@ -164,7 +131,6 @@ export class ChatListComponent implements OnInit, OnDestroy {
       next: (response) => {
         if (response.success) {
           this.contacts = response.data.contacts;
-          this.applyFilter();
         }
       },
       error: (err) => console.error('Error loading contacts:', err)
@@ -181,12 +147,12 @@ export class ChatListComponent implements OnInit, OnDestroy {
       next: (response) => {
         if (response.success) {
           const conversationId = response.data.id.toString();
-
+          
           const existingChat = this.chatService.findChatById(response.data.id);
           if (!existingChat) {
             this.chatService.addNewChat(this.chatService.mapConversation(response.data));
           }
-
+          
           this.chatService.selectChat(conversationId);
           this.showContacts = false;
           this.activeFilter = 'All';
@@ -210,17 +176,22 @@ export class ChatListComponent implements OnInit, OnDestroy {
 
   isUserOnline(chat: Chat): boolean {
     if (chat.type === 'GROUP') return false;
+    
+    // Check WebSocket presence first, fallback to API data
     if (chat.otherUserId) {
       const presence = this.presenceService.getUserPresence(chat.otherUserId);
-      // console.log('[ChatList] isUserOnline chat:', chat.id, 'otherUserId:', chat.otherUserId, 'presence:', presence);
-      if (presence) return presence.status === 'ONLINE';
+      if (presence) {
+        return presence.status === 'ONLINE';
+      }
     }
+    
+    // Fallback to static API data
     return chat.isOnline === true;
   }
 
   getLastSeenText(chat: Chat): string {
     if (chat.type === 'GROUP') return '';
-
+    
     // Check WebSocket presence first, fallback to API data
     if (chat.otherUserId) {
       const presence = this.presenceService.getUserPresence(chat.otherUserId);
@@ -229,18 +200,18 @@ export class ChatListComponent implements OnInit, OnDestroy {
         return this.presenceService.getLastSeen(chat.otherUserId);
       }
     }
-
+    
     // Fallback to static API data
     if (chat.isOnline) return 'online';
     if (!chat.lastActiveAt) return '';
-
+    
     const lastActive = new Date(chat.lastActiveAt);
     if (isNaN(lastActive.getTime())) return '';
-
+    
     const now = new Date();
     const diffMs = now.getTime() - lastActive.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-
+    
     if (diffMins < 1) return 'last seen just now';
     if (diffMins < 60) return `last seen ${diffMins} minutes ago`;
     if (diffMins < 1440) return `last seen ${Math.floor(diffMins / 60)} hours ago`;
