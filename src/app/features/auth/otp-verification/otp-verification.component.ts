@@ -3,10 +3,10 @@ import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription, interval, take } from 'rxjs';
 import { AuthService } from 'src/app/core/services/auth.service';
+import { TokenService } from 'src/app/core/services/token.service';
 import { LoaderService } from 'src/app/shared/services/loader.service';
 import { ToastService } from 'src/app/shared/services/toast.service';
 import { UserService } from '../../chat/services/user.service';
-import { TokenService } from 'src/app/core/services/token.service';
 
 
 @Component({
@@ -45,7 +45,7 @@ export class OtpVerificationComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.authService.loadTempSessionId();
     this.authService.getTempSessionId().subscribe(id => this.tempSessionId = id);
-    
+
     const expiresIn = this.authService.getOtpExpiresIn();
     const timestamp = this.authService.getOtpTimestamp();
     if (timestamp) {

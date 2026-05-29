@@ -1,6 +1,6 @@
 import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
-import { takeUntil } from 'rxjs/operators';
+import { debounceTime, takeUntil } from 'rxjs/operators';
 import { ChatService } from '../services/chat.service';
 import { UserService } from '../services/user.service';
 import { WebSocketService } from '../services/websocket.service';
@@ -15,6 +15,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
   selectedChatId: string | null = null;
   isMobile = window.innerWidth < 790;
   private destroy$ = new Subject<void>();
+  private reload$ = new Subject<void>();
 
   @HostListener('window:resize')
   onResize() { this.isMobile = window.innerWidth < 790; }
@@ -31,6 +32,11 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
     this.chatService.showNewChatView$.subscribe(show => { this.showNewChatView = show; });
     this.chatService.selectedChatId$.subscribe(id => { this.selectedChatId = id; });
 
+    // Debounce all reload triggers so rapid events only cause one API call
+    this.reload$
+      .pipe(debounceTime(300), takeUntil(this.destroy$))
+      .subscribe(() => this.chatService.reloadConversations());
+
     this.webSocketService.unreadUpdate$
       .pipe(takeUntil(this.destroy$))
       .subscribe(update => {
@@ -39,7 +45,7 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
           this.chatService.updateChatFromUnreadEvent(
             update.conversationId,
             update.lastMessage,
-            !isConversationOpen  // only increment badge if conversation is not open
+            !isConversationOpen
           );
         }
       });
@@ -58,24 +64,75 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
         }
       });
 
-    // New conversation pushed from backend (user was added to a new chat/group)
+    // New conversation pushed from backend (first message to unknown user, re-surface, or new group)
     this.webSocketService.newConversation$
       .pipe(takeUntil(this.destroy$))
       .subscribe(payload => {
-        if (payload.conversationId && !payload.id) {
-          // INDIVIDUAL first-message push — partial payload, reload to get full conversation
-          this.chatService.reloadConversations();
+        const conversationId = payload.conversationId ?? payload.id;
+        const lm = payload.lastMessage;
+        const exists = this.chatService.findChatById(conversationId);
+
+        if (exists) {
+          // Already in list (re-surfaced or duplicate event) — update unread + last message
+          const isOpen = this.selectedChatId === conversationId.toString();
+          this.chatService.updateChatFromUnreadEvent(
+            conversationId,
+            { content: lm?.content, messageType: lm?.messageType, timestamp: lm?.timestamp, senderId: lm?.senderId, senderName: lm?.senderName },
+            !isOpen
+          );
         } else {
-          // GROUP creation push — full ConversationResponse shape
-          this.chatService.addNewChat(this.chatService.mapConversation(payload));
+          // Brand new — backend now sends full payload, build conversation directly
+          const normalized = {
+            id: conversationId,
+            type: payload.type || 'INDIVIDUAL',
+            title: payload.title || lm?.senderName || '',
+            profileImageUrl: payload.profileImageUrl || null,
+            mobileNumber: payload.mobileNumber || null,
+            otherUserId: payload.otherUserId || lm?.senderId,
+            isOnline: payload.isOnline ?? null,
+            lastActiveAt: payload.lastActiveAt || null,
+            unreadCount: payload.unreadCount || 1,
+            lastMessageAt: lm?.timestamp || null,
+            createdAt: payload.createdAt || lm?.timestamp || null,
+            isPinned: false, isMuted: false, isArchived: false, isFavorite: false,
+            lastMessage: lm ? {
+              id: lm.id, content: lm.content, type: lm.messageType,
+              timestamp: lm.timestamp,
+              sender: { id: lm.senderId, displayName: lm.senderName },
+              status: 'SENT'
+            } : null
+          };
+          this.chatService.upsertChat(normalized as any);
         }
       });
 
-    // Existing group had participants added — reload to reflect updated participant list
+    // Conversation-update events: PARTICIPANT_ADDED, PARTICIPANT_REMOVED, PARTICIPANT_LEFT, PARTICIPANT_READDED
     this.webSocketService.conversationUpdate$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(() => {
-        this.chatService.reloadConversations();
+      .subscribe(payload => {
+        const event = payload.event;
+        const conversationId = payload.conversationId;
+
+        if (event === 'PARTICIPANT_REMOVED') {
+          // If current user was removed — remove conversation from list
+          const currentUserId = this.chatService.getCurrentUserId();
+          if (payload.removedUserId === currentUserId) {
+            this.chatService.removeChat(conversationId.toString());
+            this.chatService.clearSelection();
+          } else {
+            // Another member removed — reload participant list
+            this.reload$.next();
+          }
+        } else if (event === 'PARTICIPANT_LEFT') {
+          // Someone left — reload to update participant list
+          this.reload$.next();
+        } else if (event === 'PARTICIPANT_ADDED') {
+          // New members added — reload to get updated participant list
+          this.reload$.next();
+        } else if (event === 'PARTICIPANT_READDED') {
+          // Current user was re-added to a group
+          this.chatService.fetchAndAddConversation(conversationId);
+        }
       });
   }
 
@@ -84,5 +141,6 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    this.reload$.complete();
   }
 }

@@ -21,7 +21,7 @@ export interface ChatMessage {
 export class WebSocketService {
   private stompClient: Client | null = null;
   private messageSubject = new BehaviorSubject<any>(null);
-  private messageStatusSubject = new Subject<{ messageId: number; conversationId: number; status: string }>();
+  private messageStatusSubject = new Subject<{ conversationId: number; status: string; readByUserId?: number }>();
   private reactionSubject = new Subject<{ messageId: number; conversationId: number; emoji: string; action: string; reactorId: number; reactorName: string }>();
   private unreadUpdateSubject = new Subject<{
     conversationId: number;
@@ -37,6 +37,7 @@ export class WebSocketService {
   }>();
   private newConversationSubject = new Subject<any>();
   private conversationUpdateSubject = new Subject<any>();
+  private participantRemovedSubject = new Subject<{ conversationId: number; removedByName: string }>();
 
   message$ = this.messageSubject.asObservable();
   messageStatus$ = this.messageStatusSubject.asObservable();
@@ -44,6 +45,7 @@ export class WebSocketService {
   unreadUpdate$ = this.unreadUpdateSubject.asObservable();
   newConversation$ = this.newConversationSubject.asObservable();
   conversationUpdate$ = this.conversationUpdateSubject.asObservable();
+  participantRemoved$ = this.participantRemovedSubject.asObservable();
 
   constructor(
     private tokenService: TokenService,
@@ -78,7 +80,15 @@ export class WebSocketService {
         this.newConversationSubject.next(JSON.parse(message.body));
       });
       this.stompClient?.subscribe(`/user/queue/conversation-update`, (message: IMessage) => {
-        this.conversationUpdateSubject.next(JSON.parse(message.body));
+        const payload = JSON.parse(message.body);
+        if (payload.event === 'PARTICIPANT_REMOVED') {
+          this.participantRemovedSubject.next({
+            conversationId: payload.conversationId,
+            removedByName: payload.removedByName || 'Admin'
+          });
+        }
+        // Always forward full payload for all events
+        this.conversationUpdateSubject.next(payload);
       });
       this.presenceService.initialize(this.stompClient!);
       this.typingIndicatorService.initialize(this.stompClient!, parseInt(userId));
@@ -124,23 +134,25 @@ export class WebSocketService {
     }
   }
 
+  private subscribedConversations = new Set<number>();
+
   subscribeToConversation(conversationId: number): void {
-    if (this.stompClient?.connected) {
-      this.stompClient.subscribe(`/user/queue/conversation/${conversationId}`, (message: IMessage) => {
-        const parsed = JSON.parse(message.body);
-        parsed.conversationId = conversationId;
-        this.messageSubject.next(parsed);
-      });
-      this.stompClient.subscribe(`/user/queue/reaction/${conversationId}`, (message: IMessage) => {
-        this.reactionSubject.next(JSON.parse(message.body));
-      });
-    }
+    if (!this.stompClient?.connected || this.subscribedConversations.has(conversationId)) return;
+    this.subscribedConversations.add(conversationId);
+    this.stompClient.subscribe(`/user/queue/conversation/${conversationId}`, (message: IMessage) => {
+      const parsed = JSON.parse(message.body);
+      parsed.conversationId = conversationId;
+      this.messageSubject.next(parsed);
+    });
+    this.stompClient.subscribe(`/user/queue/reaction/${conversationId}`, (message: IMessage) => {
+      this.reactionSubject.next(JSON.parse(message.body));
+    });
   }
 
   disconnect(): void {
     if (this.stompClient?.connected) {
       this.presenceService.goOffline();
-      // Give time for presence update before disconnecting
+      this.subscribedConversations.clear();
       setTimeout(() => {
         this.presenceService.destroy();
         this.stompClient?.deactivate();
