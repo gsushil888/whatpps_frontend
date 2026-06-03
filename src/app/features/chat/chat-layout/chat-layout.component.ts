@@ -114,11 +114,14 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
         const conversationId = payload.conversationId;
 
         if (event === 'PARTICIPANT_REMOVED') {
-          // If current user was removed — remove conversation from list
           const currentUserId = this.chatService.getCurrentUserId();
           if (payload.removedUserId === currentUserId) {
-            this.chatService.removeChat(conversationId.toString());
-            this.chatService.clearSelection();
+            // Keep conversation in list — just mark as removed (read-only)
+            this.chatService.markAsRemoved(
+              conversationId.toString(),
+              payload.removedAt || new Date().toISOString(),
+              payload.removedByName || 'Admin'
+            );
           } else {
             // Another member removed — reload participant list
             this.reload$.next();
@@ -130,8 +133,8 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
           // New members added — reload to get updated participant list
           this.reload$.next();
         } else if (event === 'PARTICIPANT_READDED') {
-          // Current user was re-added to a group
-          this.chatService.fetchAndAddConversation(conversationId);
+          // Current user was re-added — clear removed state, keep conversation in list
+          this.chatService.clearRemovedState(conversationId.toString());
         }
       });
   }

@@ -5,6 +5,7 @@ import * as SockJS from 'sockjs-client';
 import { PresenceService } from 'src/app/core/services/presence.service';
 import { TokenService } from 'src/app/core/services/token.service';
 import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
+import { CallService } from '../../call/services/call.service';
 import { environment } from 'src/environments/environment';
 
 export interface ChatMessage {
@@ -37,7 +38,7 @@ export class WebSocketService {
   }>();
   private newConversationSubject = new Subject<any>();
   private conversationUpdateSubject = new Subject<any>();
-  private participantRemovedSubject = new Subject<{ conversationId: number; removedByName: string }>();
+  private participantRemovedSubject = new Subject<{ conversationId: number; removedUserId: number; removedByUserId: number; removedByName: string; removedAt: string }>();
 
   message$ = this.messageSubject.asObservable();
   messageStatus$ = this.messageStatusSubject.asObservable();
@@ -50,7 +51,8 @@ export class WebSocketService {
   constructor(
     private tokenService: TokenService,
     private presenceService: PresenceService,
-    private typingIndicatorService: TypingIndicatorService
+    private typingIndicatorService: TypingIndicatorService,
+    private callService: CallService
   ) { }
 
   connect(): void {
@@ -84,7 +86,10 @@ export class WebSocketService {
         if (payload.event === 'PARTICIPANT_REMOVED') {
           this.participantRemovedSubject.next({
             conversationId: payload.conversationId,
-            removedByName: payload.removedByName || 'Admin'
+            removedUserId: payload.removedUserId,
+            removedByUserId: payload.removedByUserId,
+            removedByName: payload.removedByName || 'Admin',
+            removedAt: payload.removedAt || new Date().toISOString()
           });
         }
         // Always forward full payload for all events
@@ -92,6 +97,7 @@ export class WebSocketService {
       });
       this.presenceService.initialize(this.stompClient!);
       this.typingIndicatorService.initialize(this.stompClient!, parseInt(userId));
+      this.callService.initialize(this.stompClient!);
     };
 
     this.stompClient.activate();

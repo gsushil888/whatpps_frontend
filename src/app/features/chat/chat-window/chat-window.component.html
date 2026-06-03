@@ -24,10 +24,10 @@
         </div>
       </div>
       <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-        <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <button (click)="startCall('VIDEO')" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
           <i class="fas fa-video text-lg"></i>
         </button>
-        <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <button (click)="startCall('VOICE')" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
           <i class="fas fa-phone text-lg"></i>
         </button>
         <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
@@ -79,8 +79,15 @@
             </span>
           </div>
 
+          <!-- System Message (add/remove events) -->
+          <div *ngIf="msg.messageType === 'SYSTEM'" class="flex justify-center my-1">
+            <span class="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-3 py-1 rounded-full">
+              {{ msg.content }}
+            </span>
+          </div>
+
           <!-- Message -->
-          <div class="flex mb-1" [class.justify-end]="isCurrentUser(msg.senderId)"
+          <div *ngIf="msg.messageType !== 'SYSTEM'" class="flex mb-1" [class.justify-end]="isCurrentUser(msg.senderId)"
             [class.justify-start]="!isCurrentUser(msg.senderId)">
             <div class="flex gap-1 max-w-[80%] min-w-0" [class.flex-row-reverse]="isCurrentUser(msg.senderId)">
               <!-- Avatar spacer: only in group chat for other users' messages -->
@@ -96,7 +103,7 @@
                   [class.dark:bg-green-600]="isCurrentUser(msg.senderId)"
                   [class.text-gray-800]="!isCurrentUser(msg.senderId)"
                   [class.dark:text-gray-100]="!isCurrentUser(msg.senderId)"
-                  [class.text-white]="isCurrentUser(msg.senderId)" (click)="toggleReactionPicker(msg.id, $event)">
+                  [class.text-white]="isCurrentUser(msg.senderId)" (click)="!removedFromGroup && toggleReactionPicker(msg.id, $event)">
                   <p *ngIf="shouldShowSenderName(msg, i)" class="text-xs font-semibold mb-1 opacity-80">
                     {{ getSenderDisplayName(msg) }}
                   </p>
@@ -233,14 +240,24 @@
         </ng-container>
 
         <!-- WhatsApp-style Typing Indicator -->
-        <div *ngIf="isTyping" class="flex justify-start">
-          <div class="bg-white dark:bg-gray-700 px-4 py-3 rounded-lg shadow-sm flex items-center gap-2">
-            <div class="w-2 h-2 rounded-full bg-gray-600 dark:bg-gray-400 animate-bounce" style="animation-delay: 0s;">
+        <div *ngIf="isTyping && !removedFromGroup" class="flex justify-start">
+          <div class="bg-white dark:bg-gray-700 px-3 py-2 rounded-lg shadow-sm max-w-[220px]">
+            <!-- One typer per row -->
+            <div *ngFor="let user of typingList" class="flex items-center justify-between gap-2 mb-1">
+              <ng-container *ngIf="user.isContact; else nonContact">
+                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">{{ user.displayName }}</span>
+              </ng-container>
+              <ng-template #nonContact>
+                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">~{{ user.displayName }}</span>
+                <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ user.mobileNumber }}</span>
+              </ng-template>
             </div>
-            <div class="w-2 h-2 rounded-full bg-gray-600 dark:bg-gray-400 animate-bounce"
-              style="animation-delay: 0.15s;"></div>
-            <div class="w-2 h-2 rounded-full bg-gray-600 dark:bg-gray-400 animate-bounce"
-              style="animation-delay: 0.3s;"></div>
+            <!-- Dots -->
+            <div class="flex items-center gap-1.5 mt-1">
+              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0s;"></div>
+              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0.15s;"></div>
+              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0.3s;"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -250,7 +267,9 @@
       <!-- Removed from group banner -->
       <div *ngIf="removedFromGroup" class="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
         <i class="fas fa-ban text-red-400 mr-1"></i>
-        You were removed by {{ removedFromGroup.removedByName }}
+        You were removed by <strong>{{ removedFromGroup.removedByName || 'Admin' }}</strong>
+        <span class="mx-1">·</span>
+        {{ removedFromGroup.removedAt | date:'mediumDate' }}
       </div>
       <!-- Normal input -->
       <div *ngIf="!removedFromGroup" class="flex items-center gap-2">

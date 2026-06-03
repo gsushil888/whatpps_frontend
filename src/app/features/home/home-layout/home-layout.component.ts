@@ -2,6 +2,7 @@ import { Component, HostListener, OnDestroy, OnInit } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { CallService } from '../../call/services/call.service';
 import { ChatService } from '../../chat/services/chat.service';
 import { WebSocketService } from '../../chat/services/websocket.service';
 
@@ -14,11 +15,13 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
   showBottomNav = true;
   selectedChatId: string | null = null;
+  isCallsRoute = false;
 
   constructor(
     private router: Router,
     private chatService: ChatService,
-    private webSocketService: WebSocketService
+    private webSocketService: WebSocketService,
+    public callService: CallService
   ) { }
 
   ngOnInit(): void {
@@ -26,6 +29,7 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
     console.log("Connecting to Websocket...")
 
     this.webSocketService.connect();
+    this.updateBottomNav();
 
     this.chatService.selectedChatId$
       .pipe(takeUntil(this.destroy$))
@@ -44,6 +48,7 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
     const url = this.router.url;
     const inChat = url.includes('/chat') && !!this.selectedChatId;
     const inDetail = url.includes('/status') || url.includes('/call');
+    this.isCallsRoute = url.includes('/call');
     this.showBottomNav = !(inChat || inDetail);
   }
 

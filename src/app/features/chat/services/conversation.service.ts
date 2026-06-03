@@ -40,6 +40,8 @@ export interface Conversation {
   isMuted: boolean;
   isArchived: boolean;
   isFavorite: boolean;
+  removedAt?: string | null;
+  removedByName?: string | null;
   mobileNumber?: string;
   isOnline?: boolean | null;
   lastActiveAt?: string | null;

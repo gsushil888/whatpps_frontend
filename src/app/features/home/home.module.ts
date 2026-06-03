@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { NgModule } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { SharedModule } from '../../shared/shared.module';
+import { CallModule } from '../call/call.module';
 
 import { HomeLayoutComponent } from './home-layout/home-layout.component';
 import { HomeRoutingModule } from './home-routing.module';
@@ -18,7 +19,8 @@ import { ProfileComponent } from './profile/profile.component';
     CommonModule,
     RouterModule,
     SharedModule,
-    HomeRoutingModule
+    HomeRoutingModule,
+    CallModule
   ],
   exports: [
     HomeLayoutComponent,

@@ -25,6 +25,8 @@ export interface Chat {
   isFavorite?: boolean;
   isArchived?: boolean;
   isMuted?: boolean;
+  removedAt?: string | null;
+  removedByName?: string | null;
 }
 
 @Injectable({
@@ -134,7 +136,9 @@ export class ChatService {
       isPinned: conversation.isPinned || false,
       isFavorite: conversation.isFavorite || false,
       isArchived: conversation.isArchived || false,
-      isMuted: conversation.isMuted || false
+      isMuted: conversation.isMuted || false,
+      removedAt: conversation.removedAt || null,
+      removedByName: conversation.removedByName || null
     };
   }
 
@@ -279,6 +283,27 @@ export class ChatService {
     const currentChats = this.chatsSubject.value;
     const updatedChats = currentChats.filter(chat => chat.id !== chatId);
     this.chatsSubject.next(updatedChats);
+  }
+
+  markAsRemoved(chatId: string, removedAt: string, removedByName: string) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId ? { ...c, removedAt, removedByName } : c
+    );
+    this.chatsSubject.next(chats);
+  }
+
+  clearRemovedState(chatId: string) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId ? { ...c, removedAt: null, removedByName: null } : c
+    );
+    this.chatsSubject.next(chats);
+  }
+
+  patchOtherUserId(chatId: string, otherUserId: number) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId ? { ...c, otherUserId } : c
+    );
+    this.chatsSubject.next(chats);
   }
 
   toggleChatFlag(chatId: string, flag: 'isPinned' | 'isFavorite' | 'isArchived' | 'isMuted') {

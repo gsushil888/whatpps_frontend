@@ -3,7 +3,8 @@ import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PresenceService } from 'src/app/core/services/presence.service';
 import { TokenService } from 'src/app/core/services/token.service';
-import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
+import { TypingIndicatorService, TypingUser } from 'src/app/core/services/typing-indicator.service';
+import { CallService } from '../../call/services/call.service';
 import { Chat, ChatService } from '../services/chat.service';
 import { ConversationMessage, ConversationService } from '../services/conversation.service';
 import { WebSocketService } from '../services/websocket.service';
@@ -45,6 +46,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   private chatSwitch$ = new Subject<void>();
   isTyping = false;
   typingText = '';
+  typingList: TypingUser[] = [];
   private isAutoScrolling = false;
   activeReactionMsgId: number | null = null;
   readonly REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -59,7 +61,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     private webSocketService: WebSocketService,
     private presenceService: PresenceService,
     private typingIndicatorService: TypingIndicatorService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private callService: CallService
   ) { }
 
   ngOnInit(): void {
@@ -130,6 +133,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
         if (this.chatId) {
           this.isTyping = this.typingIndicatorService.isAnyoneTyping(parseInt(this.chatId));
           this.typingText = this.typingIndicatorService.getTypingText(parseInt(this.chatId));
+          this.typingList = this.typingIndicatorService.getTypingList(parseInt(this.chatId));
           if (this.isTyping) {
             setTimeout(() => this.scrollToBottom(), 100);
           }
@@ -140,8 +144,21 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     this.webSocketService.participantRemoved$
       .pipe(takeUntil(this.destroy$))
       .subscribe(event => {
-        if (this.chatId && event.conversationId === parseInt(this.chatId)) {
-          this.removedFromGroup = { removedByName: event.removedByName, removedAt: new Date().toISOString() };
+        if (!this.chatId || event.conversationId !== parseInt(this.chatId)) return;
+        const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+        if (event.removedUserId === currentUserId) {
+          this.removedFromGroup = { removedByName: event.removedByName, removedAt: event.removedAt };
+          this.chatService.markAsRemoved(this.chatId, event.removedAt, event.removedByName);
+        }
+      });
+
+    // Re-added to group — clear removed state (SYSTEM message in chat handles the visible notification)
+    this.webSocketService.conversationUpdate$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(payload => {
+        if (!this.chatId || payload.conversationId !== parseInt(this.chatId)) return;
+        if (payload.event === 'PARTICIPANT_READDED') {
+          this.removedFromGroup = null;
         }
       });
   }
@@ -161,6 +178,11 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
         .pipe(takeUntil(this.chatSwitch$), takeUntil(this.destroy$))
         .subscribe(chats => {
           this.currentChat = chats.find(chat => chat.id === this.chatId) || null;
+          if (this.currentChat?.removedAt) {
+            this.removedFromGroup = { removedByName: this.currentChat.removedByName || '', removedAt: this.currentChat.removedAt };
+          } else {
+            this.removedFromGroup = null;
+          }
         });
       this.loadMessages();
 
@@ -170,26 +192,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
       this.chatService.clearUnreadCount(conversationId);
       this.webSocketService.markConversationAsRead(conversationId);
-      this.checkRemovedStatus();
+      this.showChatInfo = false;
     }
-  }
-
-  private checkRemovedStatus() {
-    this.removedFromGroup = null;
-    if (!this.chatId) return;
-    this.conversationService.getConversationDetail(this.chatId)
-      .pipe(takeUntil(this.chatSwitch$), takeUntil(this.destroy$))
-      .subscribe({
-        next: (res) => {
-          if (res.success && res.data.type === 'GROUP') {
-            const currentUserId = parseInt(this.tokenService.getUserId() || '0');
-            const me = res.data.participants.find(p => p.userId === currentUserId);
-            if (me?.removedByName) {
-              this.removedFromGroup = { removedByName: me.removedByName, removedAt: me.removedAt || '' };
-            }
-          }
-        }
-      });
   }
 
   loadMessages() {
@@ -226,6 +230,46 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   }
 
   private markUnreadMessagesAsRead() { /* handled in loadCurrentChat */ }
+
+  startCall(callType: 'VIDEO' | 'VOICE') {
+    if (!this.currentChat || !this.chatId) return;
+    const conversationId = parseInt(this.chatId);
+
+    // GROUP call — always fetch detail to get all participant IDs
+    if (this.currentChat.type === 'GROUP') {
+      this.conversationService.getConversationDetail(this.chatId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(res => {
+          if (!res.success) return;
+          const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+          const participantIds = res.data.participants
+            .filter(p => p.userId !== currentUserId)
+            .map(p => p.userId);
+          if (!participantIds.length) return;
+          this.callService.initiateCall(callType, conversationId, participantIds);
+        });
+      return;
+    }
+
+    // INDIVIDUAL call — use cached otherUserId if available
+    const participantId = this.currentChat.otherUserId;
+    if (participantId) {
+      this.callService.initiateCall(callType, conversationId, [participantId]);
+      return;
+    }
+
+    // INDIVIDUAL — otherUserId not resolved yet, fetch detail
+    this.conversationService.getConversationDetail(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(res => {
+        if (!res.success) return;
+        const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+        const other = res.data.participants.find(p => p.userId !== currentUserId);
+        if (!other) return;
+        this.chatService.patchOtherUserId(this.chatId!, other.userId);
+        this.callService.initiateCall(callType, conversationId, [other.userId]);
+      });
+  }
 
   getChatName(): string {
     return this.currentChat?.name || 'Unknown';
