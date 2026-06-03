@@ -1,51 +1,154 @@
-<div class="bg-white dark:bg-gray-800">
-  <div
-    *ngFor="let call of calls"
-    class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-    (click)="selectCall(call.id)"
-    [class.bg-green-50]="call.id === selectedCallId"
-    [class.dark:bg-green-900]="call.id === selectedCallId"
-    [class.border-l-4]="call.id === selectedCallId"
-    [class.border-l-green-500]="call.id === selectedCallId"
-  >
-    <div class="relative">
-      <img
-        [src]="call.avatar"
-        class="w-12 h-12 rounded-full object-cover"
-        alt="avatar"
-      />
+<div class="flex flex-col h-full bg-white dark:bg-gray-800">
+
+  <!-- Tabs -->
+  <div class="flex border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+    <button (click)="switchTab('recent')"
+            [class.border-b-2]="activeTab === 'recent'"
+            [class.border-green-500]="activeTab === 'recent'"
+            [class.text-green-600]="activeTab === 'recent'"
+            [class.dark:text-green-400]="activeTab === 'recent'"
+            [class.text-gray-500]="activeTab !== 'recent'"
+            class="flex-1 py-3 text-sm font-medium transition-colors">
+      Recent
+    </button>
+    <button (click)="switchTab('contacts')"
+            [class.border-b-2]="activeTab === 'contacts'"
+            [class.border-green-500]="activeTab === 'contacts'"
+            [class.text-green-600]="activeTab === 'contacts'"
+            [class.dark:text-green-400]="activeTab === 'contacts'"
+            [class.text-gray-500]="activeTab !== 'contacts'"
+            class="flex-1 py-3 text-sm font-medium transition-colors">
+      Contacts
+    </button>
+  </div>
+
+  <!-- ── RECENT TAB ── -->
+  <div *ngIf="activeTab === 'recent'" class="flex-1 overflow-y-auto">
+
+    <!-- Loading -->
+    <div *ngIf="historyLoading" class="flex flex-col gap-1 p-2">
+      <div *ngFor="let i of [1,2,3,4,5]"
+           class="h-16 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse"></div>
     </div>
 
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center justify-between mb-1">
-        <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">
-          {{ call.name }}
-        </h3>
-        <span
-          class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2"
-          >{{ call.time }}</span
-        >
+    <!-- Error -->
+    <div *ngIf="historyError && !historyLoading"
+         class="flex flex-col items-center justify-center py-10 text-gray-500 dark:text-gray-400 gap-3">
+      <i class="fas fa-exclamation-circle text-3xl text-red-400"></i>
+      <p class="text-sm">Failed to load call history</p>
+      <button (click)="loadHistory()"
+              class="text-xs text-green-600 dark:text-green-400 underline">Retry</button>
+    </div>
+
+    <!-- History list -->
+    <div *ngFor="let record of history"
+         class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
+      <!-- Avatar with direction badge -->
+      <div class="relative flex-shrink-0">
+        <img [src]="getHistoryAvatar(record)"
+             class="w-12 h-12 rounded-full object-cover" alt="avatar" />
+        <div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-800"
+             [class.bg-green-500]="record.callStatus === 'ENDED' && record.callDirection === 'OUTGOING'"
+             [class.bg-blue-500]="record.callStatus === 'ENDED' && record.callDirection === 'INCOMING'"
+             [class.bg-red-500]="isMissedOrDeclined(record)">
+          <i [class]="record.callDirection === 'OUTGOING' ? 'fas fa-arrow-up' : 'fas fa-arrow-down'"
+             class="text-white" style="font-size:8px"></i>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <i
-          class="fas fa-phone-alt text-xs"
-          [class.text-green-600]="call.type === 'Incoming'"
-          [class.text-red-600]="call.type === 'Missed'"
-          [class.text-blue-600]="call.type === 'Outgoing'"
-        ></i>
-        <p class="text-sm text-gray-600 dark:text-gray-300 truncate">
-          {{ call.type }}
-        </p>
+
+      <!-- Info -->
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate text-sm">{{ record.displayName }}</h3>
+          <i [class]="record.callType === 'VIDEO' ? 'fas fa-video' : 'fas fa-phone'"
+             class="text-xs text-gray-400 flex-shrink-0"></i>
+        </div>
+        <div class="flex items-center gap-2 mt-0.5">
+          <span [class.text-red-500]="isMissedOrDeclined(record)"
+                [class.text-gray-500]="!isMissedOrDeclined(record)"
+                class="text-xs dark:text-gray-400">{{ getStatusLabel(record) }}</span>
+          <span *ngIf="record.durationSeconds" class="text-xs text-gray-400">· {{ formatDuration(record.durationSeconds) }}</span>
+        </div>
       </div>
+
+      <!-- Time + call-back buttons -->
+      <div class="flex flex-col items-end gap-1 flex-shrink-0">
+        <span class="text-xs text-gray-400">{{ formatCallTime(record.startedAt) }}</span>
+        <div class="flex gap-1">
+          <button (click)="callBack(record, 'VOICE')"
+                  [disabled]="!!callingId"
+                  title="Voice call back"
+                  class="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-green-100 dark:hover:bg-green-900 hover:text-green-600 transition-colors disabled:opacity-40">
+            <i class="fas fa-phone text-xs"></i>
+          </button>
+          <button (click)="callBack(record, 'VIDEO')"
+                  [disabled]="!!callingId"
+                  title="Video call back"
+                  class="w-7 h-7 rounded-full flex items-center justify-center text-gray-500 dark:text-gray-400 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-600 transition-colors disabled:opacity-40">
+            <i class="fas fa-video text-xs"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div *ngIf="!historyLoading && !historyError && history.length === 0"
+         class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+      <i class="fas fa-clock-rotate-left text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
+      <p class="text-base font-medium">No recent calls</p>
+      <p class="text-sm">Your call history will appear here.</p>
     </div>
   </div>
 
-  <div
-    *ngIf="calls.length === 0"
-    class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400"
-  >
-    <i class="fas fa-phone text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
-    <p class="text-lg font-medium">No calls yet</p>
-    <p class="text-sm">Your call history will appear here</p>
+  <!-- ── CONTACTS TAB ── -->
+  <div *ngIf="activeTab === 'contacts'" class="flex-1 overflow-y-auto">
+
+    <!-- Loading -->
+    <div *ngIf="contactsLoading" class="flex flex-col gap-1 p-2">
+      <div *ngFor="let i of [1,2,3,4,5]"
+           class="h-16 rounded-lg bg-gray-100 dark:bg-gray-700 animate-pulse"></div>
+    </div>
+
+    <!-- Contact list -->
+    <div *ngFor="let chat of chats"
+         class="flex items-center gap-3 px-4 py-3 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+
+      <div class="relative flex-shrink-0">
+        <img [src]="chat.avatar || 'assets/google.svg'"
+             class="w-12 h-12 rounded-full object-cover" alt="avatar" />
+        <span *ngIf="chat.isOnline"
+              class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+      </div>
+
+      <div class="flex-1 min-w-0">
+        <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">{{ chat.name }}</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400">{{ chat.isOnline ? 'Online' : 'Offline' }}</p>
+      </div>
+
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <button (click)="startCall(chat, 'VOICE')"
+                [disabled]="!!callingId"
+                title="Voice call"
+                class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-green-100 dark:hover:bg-green-900 hover:text-green-600 transition-colors disabled:opacity-40">
+          <i class="fas fa-phone text-sm"></i>
+        </button>
+        <button (click)="startCall(chat, 'VIDEO')"
+                [disabled]="!!callingId"
+                title="Video call"
+                class="w-9 h-9 rounded-full flex items-center justify-center text-gray-600 dark:text-gray-300 hover:bg-blue-100 dark:hover:bg-blue-900 hover:text-blue-600 transition-colors disabled:opacity-40">
+          <i class="fas fa-video text-sm"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div *ngIf="!contactsLoading && chats.length === 0"
+         class="flex flex-col items-center justify-center py-12 text-gray-500 dark:text-gray-400">
+      <i class="fas fa-phone text-4xl mb-4 text-gray-300 dark:text-gray-600"></i>
+      <p class="text-lg font-medium">No contacts yet</p>
+      <p class="text-sm">Start a chat first to make calls.</p>
+    </div>
   </div>
+
 </div>

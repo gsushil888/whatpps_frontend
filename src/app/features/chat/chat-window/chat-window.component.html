@@ -4,7 +4,8 @@
     <div
       class="h-16 px-4 flex items-center justify-between border-b bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
       <div class="flex items-center gap-3 cursor-pointer">
-        <button *ngIf="isMobile" (click)="backToList.emit()" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors mr-1">
+        <button *ngIf="isMobile" (click)="backToList.emit()"
+          class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors mr-1">
           <i class="fas fa-arrow-left text-gray-600 dark:text-gray-300"></i>
         </button>
         <div class="flex items-center gap-3" (click)="toggleChatInfo()">
@@ -23,10 +24,10 @@
         </div>
       </div>
       <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-        <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <button (click)="startCall('VIDEO')" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
           <i class="fas fa-video text-lg"></i>
         </button>
-        <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <button (click)="startCall('VOICE')" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
           <i class="fas fa-phone text-lg"></i>
         </button>
         <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
@@ -40,18 +41,21 @@
     </div>
 
     <!-- Inline Search Bar -->
-    <div *ngIf="showSearch" class="px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-600 flex items-center gap-3">
+    <div *ngIf="showSearch"
+      class="px-4 py-2 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-600 flex items-center gap-3">
       <i class="fas fa-search text-gray-400 text-sm"></i>
       <input #searchInput type="text" placeholder="Search in conversation..."
         class="flex-1 bg-transparent outline-none text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400"
         [(ngModel)]="searchQuery" />
-      <span *ngIf="searchQuery" class="text-xs text-gray-400">{{ searchResultCount }} result{{ searchResultCount !== 1 ? 's' : '' }}</span>
+      <span *ngIf="searchQuery" class="text-xs text-gray-400">{{ searchResultCount }} result{{ searchResultCount !== 1 ?
+        's' : '' }}</span>
       <button (click)="closeSearch()" class="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
         <i class="fas fa-times text-sm"></i>
       </button>
     </div>
 
-    <div #messagesContainer class="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-[#efeae2] dark:bg-gray-900 whatsapp-scrollbar relative"
+    <div #messagesContainer
+      class="flex-1 overflow-y-auto overflow-x-hidden p-4 bg-[#efeae2] dark:bg-gray-900 whatsapp-scrollbar relative"
       (scroll)="onScroll($event)" style="scroll-behavior: auto;">
       <!-- Floating Sticky Date -->
       <div *ngIf="showStickyDate"
@@ -75,28 +79,31 @@
             </span>
           </div>
 
+          <!-- System Message (add/remove events) -->
+          <div *ngIf="msg.messageType === 'SYSTEM'" class="flex justify-center my-1">
+            <span class="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-3 py-1 rounded-full">
+              {{ msg.content }}
+            </span>
+          </div>
+
           <!-- Message -->
-          <div class="flex mb-1"
-            [class.justify-end]="isCurrentUser(msg.senderId)"
+          <div *ngIf="msg.messageType !== 'SYSTEM'" class="flex mb-1" [class.justify-end]="isCurrentUser(msg.senderId)"
             [class.justify-start]="!isCurrentUser(msg.senderId)">
             <div class="flex gap-1 max-w-[80%] min-w-0" [class.flex-row-reverse]="isCurrentUser(msg.senderId)">
               <!-- Avatar spacer: only in group chat for other users' messages -->
               <div *ngIf="isGroupChat() && !isCurrentUser(msg.senderId)" class="w-6 flex-shrink-0 self-start mt-0.5">
-                <img *ngIf="isFirstInSenderGroup(i)"
-                  [src]="msg.senderAvatar || 'assets/google.svg'"
+                <img *ngIf="isFirstInSenderGroup(i)" [src]="msg.senderAvatar || 'assets/google.svg'"
                   class="w-6 h-6 rounded-full object-cover" [alt]="msg.senderName" />
               </div>
               <div>
                 <!-- Bubble -->
-                <div class="px-2 py-2 rounded-md shadow-sm"
-                  [class.bg-white]="!isCurrentUser(msg.senderId)"
+                <div class="px-2 py-2 rounded-md shadow-sm" [class.bg-white]="!isCurrentUser(msg.senderId)"
                   [class.dark:bg-gray-700]="!isCurrentUser(msg.senderId)"
                   [class.bg-green-500]="isCurrentUser(msg.senderId)"
                   [class.dark:bg-green-600]="isCurrentUser(msg.senderId)"
                   [class.text-gray-800]="!isCurrentUser(msg.senderId)"
                   [class.dark:text-gray-100]="!isCurrentUser(msg.senderId)"
-                  [class.text-white]="isCurrentUser(msg.senderId)"
-                  (click)="toggleReactionPicker(msg.id, $event)">
+                  [class.text-white]="isCurrentUser(msg.senderId)" (click)="!removedFromGroup && toggleReactionPicker(msg.id, $event)">
                   <p *ngIf="shouldShowSenderName(msg, i)" class="text-xs font-semibold mb-1 opacity-80">
                     {{ getSenderDisplayName(msg) }}
                   </p>
@@ -190,24 +197,32 @@
                   </div>
 
                   <!-- Time for media messages -->
-                  <div class="text-[11px] opacity-60 text-right mt-1" *ngIf="msg.messageType !== 'TEXT'">
+                  <div class="text-[11px] opacity-60 text-right mt-1 flex items-center justify-end gap-0.5"
+                    *ngIf="msg.messageType !== 'TEXT'">
                     {{ formatTime(msg.createdAt) }}
+                    <ng-container *ngIf="isCurrentUser(msg.senderId)">
+                      <i *ngIf="msg.deliveryStatus.read > 0"
+                        class="fas fa-check-double text-[10px] text-blue-400 ml-0.5"></i>
+                      <i *ngIf="msg.deliveryStatus.read === 0 && msg.deliveryStatus.delivered > 0"
+                        class="fas fa-check-double text-[10px] ml-0.5"></i>
+                      <i *ngIf="msg.deliveryStatus.read === 0 && msg.deliveryStatus.delivered === 0"
+                        class="fas fa-check text-[10px] ml-0.5"></i>
+                    </ng-container>
                   </div>
                 </div>
 
                 <!-- Emoji trigger + picker row -->
-                <div class="flex items-center gap-1 mt-0.5"
-                  [class.justify-start]="!isCurrentUser(msg.senderId)"
+                <div class="flex items-center gap-1 mt-0.5" [class.justify-start]="!isCurrentUser(msg.senderId)"
                   [class.justify-end]="isCurrentUser(msg.senderId)">
 
                   <!-- Existing reactions -->
                   <ng-container *ngIf="activeReactionMsgId !== msg.id">
                     <span *ngFor="let group of getGroupedReactions(msg.reactions)"
                       class="flex items-center gap-0.5 bg-white dark:bg-gray-600 px-1 py-0.5 rounded-full shadow-sm text-[11px] border cursor-pointer hover:scale-110 transition-transform select-none"
-                      [class.border-green-400]="group.hasCurrentUser"
-                      [class.border-gray-200]="!group.hasCurrentUser"
+                      [class.border-green-400]="group.hasCurrentUser" [class.border-gray-200]="!group.hasCurrentUser"
                       (click)="sendReaction(msg, group.emoji)">
-                      {{ group.emoji }}<span *ngIf="group.count > 1" class="text-gray-500 dark:text-gray-300 font-medium ml-0.5">{{ group.count }}</span>
+                      {{ group.emoji }}<span *ngIf="group.count > 1"
+                        class="text-gray-500 dark:text-gray-300 font-medium ml-0.5">{{ group.count }}</span>
                     </span>
                   </ng-container>
 
@@ -225,21 +240,39 @@
         </ng-container>
 
         <!-- WhatsApp-style Typing Indicator -->
-        <div *ngIf="isTyping" class="flex justify-start">
-          <div class="bg-white dark:bg-gray-700 px-4 py-3 rounded-lg shadow-sm flex items-center gap-2">
-            <div class="w-2 h-2 rounded-full bg-gray-600 dark:bg-gray-400 animate-bounce" style="animation-delay: 0s;">
+        <div *ngIf="isTyping && !removedFromGroup" class="flex justify-start">
+          <div class="bg-white dark:bg-gray-700 px-3 py-2 rounded-lg shadow-sm max-w-[220px]">
+            <!-- One typer per row -->
+            <div *ngFor="let user of typingList" class="flex items-center justify-between gap-2 mb-1">
+              <ng-container *ngIf="user.isContact; else nonContact">
+                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">{{ user.displayName }}</span>
+              </ng-container>
+              <ng-template #nonContact>
+                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">~{{ user.displayName }}</span>
+                <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ user.mobileNumber }}</span>
+              </ng-template>
             </div>
-            <div class="w-2 h-2 rounded-full bg-gray-600 dark:bg-gray-400 animate-bounce"
-              style="animation-delay: 0.15s;"></div>
-            <div class="w-2 h-2 rounded-full bg-gray-600 dark:bg-gray-400 animate-bounce"
-              style="animation-delay: 0.3s;"></div>
+            <!-- Dots -->
+            <div class="flex items-center gap-1.5 mt-1">
+              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0s;"></div>
+              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0.15s;"></div>
+              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0.3s;"></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <div class="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
-      <div class="flex items-center gap-2">
+      <!-- Removed from group banner -->
+      <div *ngIf="removedFromGroup" class="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
+        <i class="fas fa-ban text-red-400 mr-1"></i>
+        You were removed by <strong>{{ removedFromGroup.removedByName || 'Admin' }}</strong>
+        <span class="mx-1">·</span>
+        {{ removedFromGroup.removedAt | date:'mediumDate' }}
+      </div>
+      <!-- Normal input -->
+      <div *ngIf="!removedFromGroup" class="flex items-center gap-2">
         <button
           class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
           <i class="fas fa-smile text-xl"></i>
@@ -260,7 +293,7 @@
           <i class="fas fa-microphone text-xl" *ngIf="!newMessage.trim()"></i>
           <i class="fas fa-paper-plane text-lg" *ngIf="newMessage.trim()"></i>
         </button>
-      </div>
+      </div><!-- end *ngIf="!removedFromGroup" -->
     </div>
   </div>
 
@@ -286,19 +319,38 @@
         Search
       </button>
 
-      <!-- 3. New group -->
-      <button
-        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-        New group
+      <!-- 3. Favourite -->
+      <button (click)="toggleFavorite()"
+        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
+        <span>{{ currentChat?.isFavorite ? 'Remove from favourites' : 'Add to favourites' }}</span>
+        <i class="fas fa-star text-xs" [class.text-yellow-400]="currentChat?.isFavorite"
+          [class.text-gray-400]="!currentChat?.isFavorite"></i>
       </button>
 
-      <!-- 4. Media, links & docs -->
-      <button (click)="viewContact()"
-        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-        Media, links &amp; docs
+      <!-- 4. Pin -->
+      <button (click)="togglePin()"
+        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
+        <span>{{ currentChat?.isPinned ? 'Unpin chat' : 'Pin chat' }}</span>
+        <i class="fas fa-thumbtack text-xs" [class.text-green-500]="currentChat?.isPinned"
+          [class.text-gray-400]="!currentChat?.isPinned"></i>
       </button>
 
-      <!-- 5. More (expandable) -->
+      <!-- 5. Archive -->
+      <button (click)="toggleArchive()"
+        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
+        <span>{{ currentChat?.isArchived ? 'Unarchive chat' : 'Archive chat' }}</span>
+        <i class="fas fa-archive text-xs text-gray-400"></i>
+      </button>
+
+      <!-- 6. Mute -->
+      <button (click)="toggleMute()"
+        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
+        <span>{{ currentChat?.isMuted ? 'Unmute notifications' : 'Mute notifications' }}</span>
+        <i class="fas text-xs text-gray-400" [class.fa-bell-slash]="currentChat?.isMuted"
+          [class.fa-bell]="!currentChat?.isMuted"></i>
+      </button>
+
+      <!-- 7. More (expandable) -->
       <button (click)="toggleMore(); $event.stopPropagation()"
         class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
         <span>More</span>
@@ -310,7 +362,7 @@
           class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           Report
         </button>
-        <button
+        <button (click)="blockContact()"
           class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
           Block
         </button>
@@ -468,6 +520,26 @@
       </h2>
       <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
         Archive conversations to keep your chat list organized.
+      </p>
+    </div>
+
+    <div class="text-center" *ngIf="activeFilter === 'pinned'">
+      <i class="fas fa-thumbtack text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">
+        No Pinned Chats
+      </h2>
+      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
+        Pin conversations to quickly access them here.
+      </p>
+    </div>
+
+    <div class="text-center" *ngIf="activeFilter === 'muted'">
+      <i class="fas fa-bell-slash text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">
+        No Muted Chats
+      </h2>
+      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
+        Mute notifications for conversations to see them here.
       </p>
     </div>
   </div>

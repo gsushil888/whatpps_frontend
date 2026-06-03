@@ -40,6 +40,8 @@ export interface Conversation {
   isMuted: boolean;
   isArchived: boolean;
   isFavorite: boolean;
+  removedAt?: string | null;
+  removedByName?: string | null;
   mobileNumber?: string;
   isOnline?: boolean | null;
   lastActiveAt?: string | null;
@@ -126,6 +128,9 @@ export interface Participant {
   isOnline: boolean;
   lastActiveAt: string;
   joinedAt: string;
+  removedByName?: string | null;
+  removedAt?: string | null;
+  addedByName?: string | null;
 }
 
 export interface MediaItem {
@@ -211,6 +216,38 @@ export class ConversationService {
   deleteConversation(conversationId: string): Observable<any> {
     const url = `${this.API_URL}/${conversationId}`;
     return this.http.delete(url, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  archiveConversation(conversationId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/archive`, {}, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  unarchiveConversation(conversationId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/unarchive`, {}, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  pinConversation(conversationId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/pin`, {}, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  unpinConversation(conversationId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/unpin`, {}, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  muteConversation(conversationId: string, duration: number | null = null): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/mute`, { duration }, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  unmuteConversation(conversationId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/unmute`, {}, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  favoriteConversation(conversationId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/favorite`, {}, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  unfavoriteConversation(conversationId: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/${conversationId}/unfavorite`, {}, { headers: this.tokenService.getAuthHeaders() });
   }
 
   clearConversation(conversationId: string): Observable<any> {

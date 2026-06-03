@@ -26,7 +26,7 @@ export class ChatListComponent implements OnInit, OnDestroy {
   showCreateGroup = false;
 
   listFilter = '';
-  filters = ['All', 'Favourite', 'Archived'];
+  filters = ['All', 'Favourite', 'Archived', 'Pinned', 'Muted'];
   activeFilter = 'All';
 
   searchTerm = '';
@@ -121,8 +121,10 @@ export class ChatListComponent implements OnInit, OnDestroy {
     this.showContacts = false;
     const filterMap: { [key: string]: string } = {
       'All': 'all',
-      'Favourite': 'favorite',
-      'Archived': 'archived'
+      'Favourite': 'favorites',
+      'Archived': 'archived',
+      'Pinned': 'pinned',
+      'Muted': 'muted'
     };
     this.chatService.loadConversationsByFilter(filterMap[filter]);
   }
@@ -172,29 +174,19 @@ export class ChatListComponent implements OnInit, OnDestroy {
   }
 
   selectContact(contact: Contact) {
-    const request = {
-      type: 'INDIVIDUAL' as const,
+    this.conversationService.createConversation({
+      type: 'INDIVIDUAL',
       participantId: contact.contactUserId
-    };
-
-    this.conversationService.createConversation(request).subscribe({
+    }).subscribe({
       next: (response) => {
         if (response.success) {
-          const conversationId = response.data.id.toString();
-
-          const existingChat = this.chatService.findChatById(response.data.id);
-          if (!existingChat) {
-            this.chatService.addNewChat(this.chatService.mapConversation(response.data));
-          }
-
-          this.chatService.selectChat(conversationId);
+          this.chatService.upsertChat(response.data);
+          this.chatService.selectChat(response.data.id.toString());
           this.showContacts = false;
           this.activeFilter = 'All';
         }
       },
-      error: (err) => {
-        alert(err.error?.message || 'Failed to open conversation');
-      }
+      error: (err) => alert(err.error?.message || 'Failed to open conversation')
     });
   }
 

@@ -17,7 +17,7 @@
       [class.dark:text-gray-300]="!showContacts">
       Contacts
     </button>
-    <!--[SHOW CREATE GROUP] -->
+    <!--[SHOW CREATE GROUP] 
     <button (click)="showCreateGroupView()"
       class="px-3 py-1 rounded-full text-sm font-medium transition-colors whitespace-nowrap"
       [class.bg-green-500]="showCreateGroup" [class.text-white]="showCreateGroup" [class.bg-gray-100]="!showCreateGroup"
@@ -25,6 +25,7 @@
       [class.dark:text-gray-300]="!showCreateGroup">
       <i class="fas fa-users mr-1"></i> New Group
     </button>
+    -->
   </div>
 
   <!-- Conversations List -->
@@ -44,7 +45,9 @@
 
       <div class="flex-1 min-w-0">
         <div class="flex items-center justify-between mb-1">
-          <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate">
+          <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate flex items-center gap-1">
+            <i *ngIf="chat.isPinned" class="fas fa-thumbtack text-green-500 text-xs flex-shrink-0"></i>
+            <i *ngIf="chat.isFavorite" class="fas fa-star text-yellow-400 text-xs flex-shrink-0"></i>
             {{ chat.name }}
           </h3>
           <span class="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
@@ -74,7 +77,9 @@
             </p>
           </div>
           <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-            <div *ngIf="chat.unreadCount > 0"
+            <i *ngIf="chat.isMuted" class="fas fa-bell-slash text-gray-400 text-xs"></i>
+            <i *ngIf="chat.removedAt" class="fas fa-lock text-gray-400 text-xs"></i>
+            <div *ngIf="chat.unreadCount > 0 && !chat.removedAt"
               class="min-w-[20px] h-5 bg-green-500 rounded-full flex items-center justify-center px-1">
               <span class="text-xs text-white font-medium">{{ chat.unreadCount > 99 ? '99+' : chat.unreadCount }}</span>
             </div>

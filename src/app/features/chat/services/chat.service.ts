@@ -21,6 +21,12 @@ export interface Chat {
   otherUserId?: number;
   lastMessageAt?: string | null;
   createdAt?: string | null;
+  isPinned?: boolean;
+  isFavorite?: boolean;
+  isArchived?: boolean;
+  isMuted?: boolean;
+  removedAt?: string | null;
+  removedByName?: string | null;
 }
 
 @Injectable({
@@ -126,7 +132,13 @@ export class ChatService {
       lastActiveAt: conversation.lastActiveAt,
       otherUserId: otherUserId,
       lastMessageAt: conversation.lastMessage?.timestamp || conversation.lastMessageAt || null,
-      createdAt: conversation.createdAt || null
+      createdAt: conversation.createdAt || null,
+      isPinned: conversation.isPinned || false,
+      isFavorite: conversation.isFavorite || false,
+      isArchived: conversation.isArchived || false,
+      isMuted: conversation.isMuted || false,
+      removedAt: conversation.removedAt || null,
+      removedByName: conversation.removedByName || null
     };
   }
 
@@ -174,12 +186,38 @@ export class ChatService {
     }
   }
 
+  upsertChat(conversation: Conversation) {
+    const chat = this.mapConversationToChat(conversation);
+    const currentChats = this.chatsSubject.value;
+    const idx = currentChats.findIndex(c => c.id === chat.id);
+    const updated = idx !== -1
+      ? currentChats.map(c => c.id === chat.id ? chat : c)
+      : [chat, ...currentChats];
+    this.chatsSubject.next(this.sortByLatest(updated));
+  }
+
+  getCurrentUserId(): number {
+    return parseInt(this.tokenService.getUserId() || '0');
+  }
+
   getCurrentChatId(): string | null {
     return this.selectedChatIdSubject.value;
   }
 
   toggleNewChatView(show: boolean) {
     this.showNewChatViewSubject.next(show);
+  }
+
+  fetchAndAddConversation(conversationId: number) {
+    this.conversationService.getConversationDetail(conversationId.toString()).subscribe({
+      next: (res) => {
+        if (res.success) {
+          const conv = res.data as any;
+          this.upsertChat(conv);
+        }
+      },
+      error: (err) => console.error('Error fetching conversation:', err)
+    });
   }
 
   findChatByUserId(userId: number): Chat | undefined {
@@ -245,6 +283,34 @@ export class ChatService {
     const currentChats = this.chatsSubject.value;
     const updatedChats = currentChats.filter(chat => chat.id !== chatId);
     this.chatsSubject.next(updatedChats);
+  }
+
+  markAsRemoved(chatId: string, removedAt: string, removedByName: string) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId ? { ...c, removedAt, removedByName } : c
+    );
+    this.chatsSubject.next(chats);
+  }
+
+  clearRemovedState(chatId: string) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId ? { ...c, removedAt: null, removedByName: null } : c
+    );
+    this.chatsSubject.next(chats);
+  }
+
+  patchOtherUserId(chatId: string, otherUserId: number) {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId ? { ...c, otherUserId } : c
+    );
+    this.chatsSubject.next(chats);
+  }
+
+  toggleChatFlag(chatId: string, flag: 'isPinned' | 'isFavorite' | 'isArchived' | 'isMuted') {
+    const chats = this.chatsSubject.value.map(c =>
+      c.id === chatId ? { ...c, [flag]: !c[flag] } : c
+    );
+    this.chatsSubject.next(chats);
   }
 
 }

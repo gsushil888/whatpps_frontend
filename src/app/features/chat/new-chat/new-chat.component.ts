@@ -247,43 +247,18 @@ export class NewChatComponent implements OnInit, OnDestroy {
   }
 
   startChatWithContact(contact: Contact) {
-    // Always call API - backend will return existing or create new
-    const request = {
-      type: 'INDIVIDUAL' as const,
+    this.conversationService.createConversation({
+      type: 'INDIVIDUAL',
       participantId: contact.contactUserId
-    };
-
-    this.conversationService.createConversation(request).subscribe({
+    }).subscribe({
       next: (response) => {
         if (response.success) {
-          const conversationId = response.data.id.toString();
-          
-          // Check if already in chat list
-          const existingChat = this.chatService.findChatById(response.data.id);
-          
-          if (!existingChat) {
-            // Add to chat list
-            const newChat = {
-              id: conversationId,
-              name: response.data.title,
-              avatar: response.data.profileImageUrl || 'assets/google.svg',
-              date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }),
-              time: 'now',
-              lastMessage: response.data.lastMessage?.content || '',
-              unreadCount: response.data.unreadCount || 0,
-              type: response.data.type
-            };
-            this.chatService.addNewChat(newChat);
-          }
-          
-          // Select and open chat
-          this.chatService.selectChat(conversationId);
+          this.chatService.upsertChat(response.data);
+          this.chatService.selectChat(response.data.id.toString());
           this.closeNewChatView();
         }
       },
-      error: (err) => {
-        alert(err.error?.message || 'Failed to open conversation');
-      }
+      error: (err) => alert(err.error?.message || 'Failed to open conversation')
     });
   }
 }

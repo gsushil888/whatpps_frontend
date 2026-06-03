@@ -10,6 +10,7 @@ import { CommonModule } from '@angular/common';
       <span class="dot"></span>
       <span class="dot"></span>
       <span class="dot"></span>
+      <span class="typing-text" *ngIf="text">{{ text }}</span>
     </div>
   `,
   styles: [`
@@ -52,6 +53,12 @@ import { CommonModule } from '@angular/common';
         transform: translateY(-10px);
         opacity: 1;
       }
+    }
+
+    .typing-text {
+      font-size: 12px;
+      color: #90949c;
+      margin-left: 4px;
     }
 
     :host-context(.dark) .typing-bubble {

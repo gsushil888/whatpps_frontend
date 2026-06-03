@@ -3,10 +3,13 @@ import {
   EventEmitter,
   Input,
   OnChanges,
+  OnDestroy,
   OnInit,
   Output,
   SimpleChanges
 } from '@angular/core';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
 
 import {
   ConversationDetail,
@@ -21,14 +24,14 @@ import {
 } from '../services/contact.service';
 
 import { TokenService } from 'src/app/core/services/token.service';
+import { WebSocketService } from '../services/websocket.service';
 
 @Component({
   selector: 'app-chat-info',
   templateUrl: './chat-info.component.html',
   styleUrls: ['./chat-info.component.css']
 })
-export class ChatInfoComponent
-  implements OnInit, OnChanges {
+export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
 
   @Input() chatId: string = '';
 
@@ -54,22 +57,56 @@ export class ChatInfoComponent
   // REMOVE PARTICIPANTS
   removingParticipantIds: number[] = [];
 
+  private destroy$ = new Subject<void>();
+
   constructor(
     private conversationService: ConversationService,
     private contactService: ContactService,
-    private tokenService: TokenService
+    private tokenService: TokenService,
+    private webSocketService: WebSocketService
   ) { }
 
   ngOnInit(): void {
+    this.currentUserId = parseInt(this.tokenService.getUserId() || '0');
+    if (this.chatId) this.loadChatDetail();
 
-    this.currentUserId =
-      parseInt(
-        this.tokenService.getUserId() || '0'
-      );
+    // Real-time participant updates
+    this.webSocketService.conversationUpdate$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(payload => {
+        if (!this.chatDetail || payload.conversationId !== this.chatDetail.id) return;
 
-    if (this.chatId) {
-      this.loadChatDetail();
-    }
+        if (payload.event === 'PARTICIPANT_ADDED') {
+          const added: Participant[] = payload.addedParticipants || [];
+          added.forEach(p => {
+            const exists = this.chatDetail!.participants.find(x => x.userId === p.userId);
+            if (exists) {
+              // Re-added: clear removed state
+              exists.removedByName = null;
+              exists.removedAt = null;
+            } else {
+              this.chatDetail!.participants.push(p);
+            }
+          });
+        } else if (payload.event === 'PARTICIPANT_REMOVED') {
+          const p = this.chatDetail.participants.find(x => x.userId === payload.removedUserId);
+          if (p) {
+            p.removedByName = payload.removedByName || 'Admin';
+            p.removedAt = new Date().toISOString();
+          }
+        } else if (payload.event === 'PARTICIPANT_LEFT') {
+          const p = this.chatDetail.participants.find(x => x.userId === payload.leftUserId);
+          if (p) {
+            p.removedByName = payload.leftUserName || 'Member';
+            p.removedAt = payload.leftAt || new Date().toISOString();
+          }
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -179,30 +216,17 @@ export class ChatInfoComponent
   }
 
   loadAvailableContacts() {
-
     this.contactService.getContacts().subscribe({
       next: (response: any) => {
-
-        const existingParticipantIds =
-          this.chatDetail?.participants.map(
-            (participant: Participant) =>
-              participant.userId
-          ) || [];
-
-        this.availableContacts =
-          response.data.contacts.filter(
-            (contact: Contact) =>
-              !existingParticipantIds.includes(
-                contact.contactUserId
-              )
-          );
-      },
-      error: (err) => {
-        console.error(
-          'Error loading contacts:',
-          err
+        // Only exclude active (non-removed) participants
+        const activeParticipantIds = this.chatDetail?.participants
+          .filter(p => !p.removedByName)
+          .map(p => p.userId) || [];
+        this.availableContacts = response.data.contacts.filter(
+          (c: Contact) => !activeParticipantIds.includes(c.contactUserId)
         );
-      }
+      },
+      error: (err) => console.error('Error loading contacts:', err)
     });
   }
 
@@ -278,70 +302,55 @@ export class ChatInfoComponent
   // REMOVE PARTICIPANT
   // ========================================
 
-  removeParticipant(
-    participant: Participant
-  ) {
+  removeParticipant(participant: Participant) {
+    if (!this.chatDetail) return;
+    if (!confirm(`Remove ${participant.displayName} from group?`)) return;
 
-    if (!this.chatDetail) {
-      return;
-    }
+    this.removingParticipantIds.push(participant.userId);
 
-    const confirmed = confirm(
-      `Remove ${participant.displayName} from group?`
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    this.removingParticipantIds.push(
-      participant.userId
-    );
-
-    this.conversationService
-      .removeParticipant(
-        this.chatDetail.id,
-        participant.userId
-      )
-      .subscribe({
-        next: (response: any) => {
-
-          this.removingParticipantIds =
-            this.removingParticipantIds.filter(
-              id => id !== participant.userId
-            );
-
-          if (response.success) {
-
-            this.chatDetail!.participants =
-              this.chatDetail!.participants.filter(
-                p =>
-                  p.userId !==
-                  participant.userId
-              );
+    this.conversationService.removeParticipant(this.chatDetail.id, participant.userId).subscribe({
+      next: (response: any) => {
+        this.removingParticipantIds = this.removingParticipantIds.filter(id => id !== participant.userId);
+        if (response.success) {
+          // Mark as removed in place — do NOT filter out
+          const p = this.chatDetail!.participants.find(x => x.userId === participant.userId);
+          if (p) {
+            p.removedByName = 'You';
+            p.removedAt = new Date().toISOString();
           }
-        },
-        error: (err) => {
-
-          this.removingParticipantIds =
-            this.removingParticipantIds.filter(
-              id => id !== participant.userId
-            );
-
-          console.error(
-            'Error removing participant:',
-            err
-          );
         }
-      });
+      },
+      error: (err) => {
+        this.removingParticipantIds = this.removingParticipantIds.filter(id => id !== participant.userId);
+        console.error('Error removing participant:', err);
+      }
+    });
   }
 
-  isRemovingParticipant(
-    userId: number
-  ): boolean {
-
-    return this.removingParticipantIds.includes(
-      userId
-    );
+  isRemovingParticipant(userId: number): boolean {
+    return this.removingParticipantIds.includes(userId);
   }
+
+  isRemovedParticipant(participant: Participant): boolean {
+    return !!participant.removedByName;
+  }
+
+  get currentUserParticipant(): Participant | undefined {
+    return this.chatDetail?.participants.find(p => p.userId === this.currentUserId);
+  }
+
+  get isRemovedFromGroup(): boolean {
+    return !!this.currentUserParticipant?.removedByName;
+  }
+
+  get currentUserRole(): string {
+    return this.currentUserParticipant?.participantRole || 'MEMBER';
+  }
+
+  canRemoveParticipant(participant: Participant): boolean {
+    if (participant.userId === this.currentUserId) return false;
+    if (this.isRemovedParticipant(participant)) return false;
+    return this.currentUserRole === 'OWNER' || this.currentUserRole === 'ADMIN';
+  }
+
 }

@@ -1,12 +1,12 @@
 import { ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
-import { TokenService } from 'src/app/core/services/token.service';
 import { PresenceService } from 'src/app/core/services/presence.service';
-import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
+import { TokenService } from 'src/app/core/services/token.service';
+import { TypingIndicatorService, TypingUser } from 'src/app/core/services/typing-indicator.service';
+import { CallService } from '../../call/services/call.service';
 import { Chat, ChatService } from '../services/chat.service';
 import { ConversationMessage, ConversationService } from '../services/conversation.service';
-import { ContactService } from '../services/contact.service';
 import { WebSocketService } from '../services/websocket.service';
 
 @Component({
@@ -40,10 +40,13 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   hasMoreMessages = true;
   stickyDate = '';
   showStickyDate = false;
+  removedFromGroup: { removedByName: string; removedAt: string } | null = null;
   private scrollTimeout: any;
   private destroy$ = new Subject<void>();
+  private chatSwitch$ = new Subject<void>();
   isTyping = false;
   typingText = '';
+  typingList: TypingUser[] = [];
   private isAutoScrolling = false;
   activeReactionMsgId: number | null = null;
   readonly REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -54,12 +57,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   constructor(
     private chatService: ChatService,
     private conversationService: ConversationService,
-    private contactService: ContactService,
     private tokenService: TokenService,
     private webSocketService: WebSocketService,
     private presenceService: PresenceService,
     private typingIndicatorService: TypingIndicatorService,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
+    private callService: CallService
   ) { }
 
   ngOnInit(): void {
@@ -67,7 +70,6 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(chatId => {
         this.chatId = chatId;
-        console.log('🔵 Selected conversation ID:', chatId);
         this.showChatInfo = false;
         this.loadCurrentChat();
       });
@@ -82,12 +84,10 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     this.webSocketService.message$
       .pipe(takeUntil(this.destroy$))
       .subscribe(message => {
-        console.log('📨 WebSocket message received:', message);
-        if (message) {
-          console.log('✅ Adding message to current conversation');
+        if (message && this.chatId && message.conversationId === parseInt(this.chatId)) {
           this.addMessageToList(message);
           const currentUserId = parseInt(this.tokenService.getUserId() || '0');
-          if (message.senderId !== currentUserId && this.chatId) {
+          if (message.senderId !== currentUserId) {
             this.webSocketService.markConversationAsRead(parseInt(this.chatId));
           }
         }
@@ -102,13 +102,22 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     this.webSocketService.messageStatus$
       .pipe(takeUntil(this.destroy$))
       .subscribe(statusUpdate => {
-        const msg = this.messages.find(m => m.id === statusUpdate.messageId);
-        if (msg) {
-          if (statusUpdate.status === 'DELIVERED') {
-            msg.deliveryStatus = { ...msg.deliveryStatus, delivered: 1 };
-          } else if (statusUpdate.status === 'READ') {
-            msg.deliveryStatus = { ...msg.deliveryStatus, delivered: 1, read: 1 };
-          }
+        if (statusUpdate.status === 'READ' && this.chatId &&
+          statusUpdate.conversationId === parseInt(this.chatId)) {
+          // Mark all messages in this conversation as read
+          this.messages.forEach(m => {
+            if (this.isCurrentUser(m.senderId)) {
+              m.deliveryStatus = { ...m.deliveryStatus, delivered: 1, read: 1 };
+            }
+          });
+          this.cdr.markForCheck();
+        } else if (statusUpdate.status === 'DELIVERED' && this.chatId &&
+          statusUpdate.conversationId === parseInt(this.chatId)) {
+          this.messages.forEach(m => {
+            if (this.isCurrentUser(m.senderId) && m.deliveryStatus.read === 0) {
+              m.deliveryStatus = { ...m.deliveryStatus, delivered: 1 };
+            }
+          });
           this.cdr.markForCheck();
         }
       });
@@ -124,9 +133,32 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
         if (this.chatId) {
           this.isTyping = this.typingIndicatorService.isAnyoneTyping(parseInt(this.chatId));
           this.typingText = this.typingIndicatorService.getTypingText(parseInt(this.chatId));
+          this.typingList = this.typingIndicatorService.getTypingList(parseInt(this.chatId));
           if (this.isTyping) {
             setTimeout(() => this.scrollToBottom(), 100);
           }
+        }
+      });
+
+    // Real-time removal from group
+    this.webSocketService.participantRemoved$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => {
+        if (!this.chatId || event.conversationId !== parseInt(this.chatId)) return;
+        const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+        if (event.removedUserId === currentUserId) {
+          this.removedFromGroup = { removedByName: event.removedByName, removedAt: event.removedAt };
+          this.chatService.markAsRemoved(this.chatId, event.removedAt, event.removedByName);
+        }
+      });
+
+    // Re-added to group — clear removed state (SYSTEM message in chat handles the visible notification)
+    this.webSocketService.conversationUpdate$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(payload => {
+        if (!this.chatId || payload.conversationId !== parseInt(this.chatId)) return;
+        if (payload.event === 'PARTICIPANT_READDED') {
+          this.removedFromGroup = null;
         }
       });
   }
@@ -134,29 +166,33 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.chatSwitch$.complete();
     this.stopCamera();
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
   }
 
   loadCurrentChat() {
+    this.chatSwitch$.next();
     if (this.chatId) {
       this.chatService.chats$
-        .pipe(takeUntil(this.destroy$))
+        .pipe(takeUntil(this.chatSwitch$), takeUntil(this.destroy$))
         .subscribe(chats => {
-          console.log("Chats Loaded", chats);
           this.currentChat = chats.find(chat => chat.id === this.chatId) || null;
+          if (this.currentChat?.removedAt) {
+            this.removedFromGroup = { removedByName: this.currentChat.removedByName || '', removedAt: this.currentChat.removedAt };
+          } else {
+            this.removedFromGroup = null;
+          }
         });
       this.loadMessages();
 
-      // Subscribe to conversation topic for real-time messages
       const conversationId = parseInt(this.chatId);
-      console.log('🔔 Subscribing to conversation:', conversationId);
       this.webSocketService.subscribeToConversation(conversationId);
       this.typingIndicatorService.subscribeToConversation(conversationId);
 
-      // Clear unread badge locally and persist to backend
       this.chatService.clearUnreadCount(conversationId);
       this.webSocketService.markConversationAsRead(conversationId);
+      this.showChatInfo = false;
     }
   }
 
@@ -185,7 +221,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
         });
 
       this.chatService.chats$
-        .pipe(takeUntil(this.destroy$))
+        .pipe(takeUntil(this.chatSwitch$), takeUntil(this.destroy$))
         .subscribe(chats => {
           const chat = chats.find(c => c.id === this.chatId);
           this.conversationType = chat?.type || 'INDIVIDUAL';
@@ -193,9 +229,46 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     }
   }
 
-  private markUnreadMessagesAsRead() {
-    if (!this.chatId) return;
-    this.webSocketService.markConversationAsRead(parseInt(this.chatId));
+  private markUnreadMessagesAsRead() { /* handled in loadCurrentChat */ }
+
+  startCall(callType: 'VIDEO' | 'VOICE') {
+    if (!this.currentChat || !this.chatId) return;
+    const conversationId = parseInt(this.chatId);
+
+    // GROUP call — always fetch detail to get all participant IDs
+    if (this.currentChat.type === 'GROUP') {
+      this.conversationService.getConversationDetail(this.chatId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(res => {
+          if (!res.success) return;
+          const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+          const participantIds = res.data.participants
+            .filter(p => p.userId !== currentUserId)
+            .map(p => p.userId);
+          if (!participantIds.length) return;
+          this.callService.initiateCall(callType, conversationId, participantIds);
+        });
+      return;
+    }
+
+    // INDIVIDUAL call — use cached otherUserId if available
+    const participantId = this.currentChat.otherUserId;
+    if (participantId) {
+      this.callService.initiateCall(callType, conversationId, [participantId]);
+      return;
+    }
+
+    // INDIVIDUAL — otherUserId not resolved yet, fetch detail
+    this.conversationService.getConversationDetail(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(res => {
+        if (!res.success) return;
+        const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+        const other = res.data.participants.find(p => p.userId !== currentUserId);
+        if (!other) return;
+        this.chatService.patchOtherUserId(this.chatId!, other.userId);
+        this.callService.initiateCall(callType, conversationId, [other.userId]);
+      });
   }
 
   getChatName(): string {
@@ -206,7 +279,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     if (!this.currentChat || this.currentChat.type === 'GROUP') return '';
     if (this.currentChat.otherUserId) {
       const presence = this.presenceService.getUserPresence(this.currentChat.otherUserId);
-      console.log('[ChatWindow] getChatOnlineStatus for userId', this.currentChat.otherUserId, ':', presence);
+      // console.log('[ChatWindow] getChatOnlineStatus for userId', this.currentChat.otherUserId, ':', presence);
       const lastSeen = this.presenceService.getLastSeen(this.currentChat.otherUserId);
       if (lastSeen) return lastSeen;
     }
@@ -297,40 +370,17 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   sendMessage() {
     if (this.newMessage.trim() && this.chatId) {
       const conversationId = parseInt(this.chatId);
-      const message = {
-        messageType: 'TEXT',
-        content: this.newMessage
-      };
-
-      console.log('📤 Sending message to conversation:', conversationId);
-      console.log('📝 Message content:', message);
-
       this.typingIndicatorService.stopTyping(conversationId);
-      this.webSocketService.sendMessage(conversationId, message);
+      this.webSocketService.sendMessage(conversationId, { messageType: 'TEXT', content: this.newMessage });
       this.newMessage = '';
-    } else {
-      console.warn('⚠️ Cannot send message. Message empty or no conversation selected');
-      console.log('Current chatId:', this.chatId, 'Message:', this.newMessage);
     }
   }
 
   private addMessageToList(message: any, skipIfDuplicate: boolean = true) {
-    console.log('➕ Adding message to list:', message);
-    console.log('Message type:', message.messageType);
-    console.log('Media metadata:', message.mediaMetadata);
-    console.log('Media URL:', message.mediaUrl);
-    console.log('Is uploading:', message.isUploading);
-
-    // Skip duplicate check for text messages to allow same content
     if (skipIfDuplicate && this.messages.length > 0 && message.messageType !== 'TEXT') {
       const lastMsg = this.messages[this.messages.length - 1];
       const timeDiff = Math.abs(new Date(message.createdAt).getTime() - new Date(lastMsg.createdAt).getTime());
-      if (lastMsg.senderId === message.senderId &&
-        lastMsg.messageType === message.messageType &&
-        timeDiff < 3000) {
-        console.log('⚠️ Skipping duplicate message');
-        return;
-      }
+      if (lastMsg.senderId === message.senderId && lastMsg.messageType === message.messageType && timeDiff < 3000) return;
     }
 
     const newMessage: ConversationMessage = {
@@ -353,8 +403,6 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       createdAt: message.createdAt || new Date().toISOString()
     };
     this.messages.push(newMessage);
-    console.log('✅ Message added. Total messages:', this.messages.length);
-    console.log('Full message object:', newMessage);
 
     if (this.chatId && newMessage.createdAt) {
       this.chatService.updateChatLastMessage(
@@ -402,7 +450,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d')?.drawImage(video, 0, 0);
-    
+
     this.capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
     this.stopCamera();
   }
@@ -602,8 +650,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   }
 
   // kept for template compatibility (no-ops now)
-  showReactionPicker(_id: number | undefined) {}
-  hideReactionPicker() {}
+  showReactionPicker(_id: number | undefined) { }
+  hideReactionPicker() { }
 
   sendReaction(msg: ConversationMessage, emoji: string) {
     if (!this.chatId || !msg.id) return;
@@ -674,6 +722,82 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     this.searchResultCount = 0;
   }
 
+  toggleFavorite() {
+    if (!this.chatId) return;
+    const isFav = this.currentChat?.isFavorite;
+    const call = isFav
+      ? this.conversationService.unfavoriteConversation(this.chatId)
+      : this.conversationService.favoriteConversation(this.chatId);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.toggleChatFlag(this.chatId!, 'isFavorite');
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling favorite:', err)
+    });
+  }
+
+  toggleArchive() {
+    if (!this.chatId) return;
+    const isArchived = this.currentChat?.isArchived;
+    const call = isArchived
+      ? this.conversationService.unarchiveConversation(this.chatId)
+      : this.conversationService.archiveConversation(this.chatId);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.reloadConversations();
+        this.chatService.clearSelection();
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling archive:', err)
+    });
+  }
+
+  togglePin() {
+    if (!this.chatId) return;
+    const isPinned = this.currentChat?.isPinned;
+    const call = isPinned
+      ? this.conversationService.unpinConversation(this.chatId)
+      : this.conversationService.pinConversation(this.chatId);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.toggleChatFlag(this.chatId!, 'isPinned');
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling pin:', err)
+    });
+  }
+
+  toggleMute() {
+    if (!this.chatId) return;
+    const isMuted = this.currentChat?.isMuted;
+    const call = isMuted
+      ? this.conversationService.unmuteConversation(this.chatId)
+      : this.conversationService.muteConversation(this.chatId, null);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.toggleChatFlag(this.chatId!, 'isMuted');
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling mute:', err)
+    });
+  }
+
+  blockContact() {
+    if (!this.chatId || !confirm('Block this contact? They will no longer be able to send you messages.')) return;
+    // Block is handled by deleting the conversation for now (no dedicated block endpoint in API)
+    this.conversationService.deleteConversation(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.chatService.removeChat(this.chatId!);
+          this.chatService.clearSelection();
+          this.closeMenuModal();
+        },
+        error: (err) => console.error('Error blocking contact:', err)
+      });
+  }
+
   closeSearch() {
     this.showSearch = false;
     this.searchQuery = '';
@@ -682,9 +806,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   deleteChat() {
     if (!this.chatId || !confirm('Delete this chat? This cannot be undone.')) return;
-    const chat = this.currentChat;
-    // For INDIVIDUAL chats, also delete the contact record so the conversation is fully removed
-    const deleteConv = () => this.conversationService.deleteConversation(this.chatId!)
+    this.conversationService.deleteConversation(this.chatId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: () => {
@@ -694,26 +816,6 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
         },
         error: (err) => console.error('Error deleting conversation:', err)
       });
-
-    if (chat?.type === 'INDIVIDUAL' && chat.otherUserId) {
-      // Find contact by otherUserId and delete it first
-      this.contactService.getContacts().pipe(takeUntil(this.destroy$)).subscribe({
-        next: (res) => {
-          const contact = res.data.contacts.find(c => c.contactUserId === chat.otherUserId);
-          if (contact) {
-            this.contactService.deleteContact(contact.id).pipe(takeUntil(this.destroy$)).subscribe({
-              next: () => deleteConv(),
-              error: () => deleteConv()
-            });
-          } else {
-            deleteConv();
-          }
-        },
-        error: () => deleteConv()
-      });
-    } else {
-      deleteConv();
-    }
   }
 
   clearMessages() {
@@ -763,10 +865,10 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     if (element.scrollTop <= 10 && this.hasMoreMessages && !this.isLoadingMessages) {
       this.loadMoreMessages();
     }
-    
+
     this.showStickyDate = true;
     this.updateStickyDate(element);
-    
+
     if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
     this.scrollTimeout = setTimeout(() => {
       this.showStickyDate = false;
@@ -775,12 +877,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   private updateStickyDate(element: HTMLElement): void {
     const dateSeparators = element.querySelectorAll('.date-separator');
-    
+
     for (let i = dateSeparators.length - 1; i >= 0; i--) {
       const separator = dateSeparators[i] as HTMLElement;
       const rect = separator.getBoundingClientRect();
       const containerRect = element.getBoundingClientRect();
-      
+
       if (rect.top <= containerRect.top + 50) {
         const dateText = separator.querySelector('span')?.textContent || '';
         this.stickyDate = dateText;
@@ -791,10 +893,10 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   private loadMoreMessages(): void {
     if (!this.chatId || this.isLoadingMessages || !this.hasMoreMessages) return;
-    
+
     this.isLoadingMessages = true;
     const oldestMessageId = this.messages[0]?.id;
-    
+
     this.conversationService.getConversationMessages(this.chatId, 20, oldestMessageId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
@@ -804,7 +906,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
             const newMessages = response.data.messages.reverse();
             this.messages = [...newMessages, ...this.messages];
             this.hasMoreMessages = response.data.pagination.hasNext;
-            
+
             setTimeout(() => {
               const newScrollHeight = this.messagesContainer.nativeElement.scrollHeight;
               this.messagesContainer.nativeElement.scrollTop = newScrollHeight - oldScrollHeight;

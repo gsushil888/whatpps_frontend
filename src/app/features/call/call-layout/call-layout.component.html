@@ -1,32 +1,57 @@
-<div class="flex flex-1 min-h-0 bg-white dark:bg-gray-900">
-  <!-- Left Panel -->
-  <div class="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800"
-    [class.hidden]="isMobile && selectedCallId"
-    [style.width]="isMobile ? '100%' : '400px'">
-    <div class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between px-4">
-      <div class="flex items-center gap-3">
-        <button *ngIf="isMobile" (click)="goHome()" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
-          <i class="fas fa-arrow-left text-gray-600 dark:text-gray-300"></i>
+<div class="flex flex-1 min-h-0 bg-white dark:bg-gray-900 relative">
+
+  <!-- Incoming call banner (only shown when on calls route) -->
+  <div *ngIf="incoming"
+       class="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 w-80">
+      <img [src]="incoming.callerProfilePictureUrl || incoming.callerAvatar || 'assets/google.svg'"
+           class="w-20 h-20 rounded-full object-cover ring-4 ring-green-400" alt="caller" />
+      <div class="text-center">
+        <p class="text-sm text-gray-500 dark:text-gray-400">Incoming {{ incoming.callType | lowercase }} call</p>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mt-1">{{ incoming.callerName }}</h2>
+      </div>
+      <div class="flex gap-8 mt-2">
+        <button (click)="declineIncoming()"
+                class="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg transition-colors">
+          <i class="fas fa-phone-slash text-xl"></i>
         </button>
-        <img src="assets/google.svg" class="w-10 h-10 rounded-full" alt="profile" />
-        <h1 class="font-semibold text-gray-800 dark:text-gray-200">Calls</h1>
+        <button (click)="answerIncoming()"
+                class="w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-colors">
+          <i class="fas fa-phone text-xl"></i>
+        </button>
       </div>
     </div>
-    <div class="flex-1 min-h-0 overflow-y-auto">
-      <app-call-list></app-call-list>
+  </div>
+  <!-- Left Panel -->
+  <div class="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800"
+       [class.hidden]="isMobile && activeCall"
+       [style.width]="isMobile ? '100%' : '400px'">
+    <div class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center px-4 gap-3">
+      <button *ngIf="isMobile" (click)="goHome()"
+              class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <i class="fas fa-arrow-left text-gray-600 dark:text-gray-300"></i>
+      </button>
+      <h1 class="font-semibold text-gray-800 dark:text-gray-200">Calls</h1>
+      <button (click)="refreshHistory()" title="Refresh"
+              class="ml-auto p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <i class="fas fa-rotate-right text-gray-500 dark:text-gray-400 text-sm"></i>
+      </button>
+    </div>
+    <div class="flex-1 min-h-0 overflow-hidden">
+      <app-call-list class="h-full"></app-call-list>
     </div>
   </div>
 
   <!-- Right Panel -->
   <div class="flex-1 min-h-0 bg-gray-50 dark:bg-gray-900"
-    [class.hidden]="isMobile && !selectedCallId">
-    <!-- Back arrow on mobile -->
-    <div *ngIf="isMobile && selectedCallId"
-      class="h-12 px-4 flex items-center bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-      <button (click)="clearSelection()" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+       [class.hidden]="isMobile && !activeCall">
+    <div *ngIf="isMobile && activeCall"
+         class="h-12 px-4 flex items-center bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+      <button (click)="callService.endCall()"
+              class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
         <i class="fas fa-arrow-left text-gray-600 dark:text-gray-300"></i>
       </button>
     </div>
-    <app-call-panel></app-call-panel>
+    <app-call-panel class="flex flex-col h-full"></app-call-panel>
   </div>
 </div>
