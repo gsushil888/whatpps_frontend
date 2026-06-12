@@ -36,6 +36,7 @@ export class SidebarComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    console.log("Constructed Sidebar Component...");
     this.activeRoute = this.router.url.split('/')[2] || '';
     this.userService.currentUser$.subscribe(user => {
       this.currentUser = user;

@@ -51,6 +51,7 @@ export class ChatService {
   setListFilter(term: string) { this.listFilterSubject.next(term); }
 
   constructor(private conversationService: ConversationService, private tokenService: TokenService, private presenceService: PresenceService) {
+    console.log("Constructing Chat Service...");
     this.presenceService.presenceBroadcast$.subscribe(presence => {
       // When we receive a presence update for a userId, find any INDIVIDUAL chat
       // whose otherUserId is undefined or doesn't match — we can't fix it here without
@@ -71,6 +72,7 @@ export class ChatService {
 
   private sortByLatest(chats: Chat[]): Chat[] {
     return [...chats].sort((a, b) => {
+      if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
       const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : new Date(a.createdAt || 0).getTime();
       const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : new Date(b.createdAt || 0).getTime();
       return tb - ta;
@@ -310,7 +312,7 @@ export class ChatService {
     const chats = this.chatsSubject.value.map(c =>
       c.id === chatId ? { ...c, [flag]: !c[flag] } : c
     );
-    this.chatsSubject.next(chats);
+    this.chatsSubject.next(flag === 'isPinned' ? this.sortByLatest(chats) : chats);
   }
 
 }

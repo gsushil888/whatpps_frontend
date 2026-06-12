@@ -1,12 +1,13 @@
 import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 import { debounceTime, distinctUntilChanged, switchMap, takeUntil } from 'rxjs/operators';
-import { ChatService } from '../services/chat.service';
-import { ContactService, Contact, AddContactRequest } from '../services/contact.service';
-import { ConversationService } from '../services/conversation.service';
-import { SearchService, SearchResult, SearchContact } from '../services/search.service';
-import { Router } from '@angular/router';
+import { AddContactRequest, Contact } from 'src/app/core/models/contact.model';
 import { TokenService } from 'src/app/core/services/token.service';
+import { ChatService } from '../services/chat.service';
+import { ContactService } from '../services/contact.service';
+import { ConversationService } from '../services/conversation.service';
+import { SearchContact, SearchResult, SearchService } from '../services/search.service';
 
 @Component({
   selector: 'app-chat-search',
@@ -53,6 +54,8 @@ export class ChatSearchComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
+    console.log("ChatSearch constructed...");
+
     this.searchSubject.pipe(
       debounceTime(350),
       distinctUntilChanged(),
@@ -77,7 +80,7 @@ export class ChatSearchComponent implements OnInit, OnDestroy {
     this.contactService.getContacts().subscribe({
       next: (response) => {
         if (response.success) {
-          this.contacts = response.data.contacts.sort((a, b) => 
+          this.contacts = response.data.contacts.sort((a, b) =>
             a.displayName.localeCompare(b.displayName)
           );
         }

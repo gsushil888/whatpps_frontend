@@ -5,8 +5,8 @@ import * as SockJS from 'sockjs-client';
 import { PresenceService } from 'src/app/core/services/presence.service';
 import { TokenService } from 'src/app/core/services/token.service';
 import { TypingIndicatorService } from 'src/app/core/services/typing-indicator.service';
-import { CallService } from '../../call/services/call.service';
 import { environment } from 'src/environments/environment';
+import { CallService } from '../../call/services/call.service';
 
 export interface ChatMessage {
   messageType: string;
@@ -14,6 +14,7 @@ export interface ChatMessage {
   mediaUrl?: string | null;
   mediaMetadata?: any;
   replyToMessageId?: number | null;
+  attachments?: any[];
 }
 
 @Injectable({
@@ -23,7 +24,7 @@ export class WebSocketService {
   private stompClient: Client | null = null;
   private messageSubject = new BehaviorSubject<any>(null);
   private messageStatusSubject = new Subject<{ conversationId: number; status: string; readByUserId?: number }>();
-  private reactionSubject = new Subject<{ messageId: number; conversationId: number; emoji: string; action: string; reactorId: number; reactorName: string }>();
+  private reactionSubject = new Subject<{ messageId: number; conversationId: number; emoji: string; action: string; reactorId: number; reactorName: string; attachmentId?: number | null }>();
   private unreadUpdateSubject = new Subject<{
     conversationId: number;
     action: string;
@@ -39,6 +40,7 @@ export class WebSocketService {
   private newConversationSubject = new Subject<any>();
   private conversationUpdateSubject = new Subject<any>();
   private participantRemovedSubject = new Subject<{ conversationId: number; removedUserId: number; removedByUserId: number; removedByName: string; removedAt: string }>();
+  private storyViewSubject = new Subject<{ storyId: number; viewCount: number; viewerId: number; viewerName: string; viewerAvatar: string; viewedAt: string }>();
 
   message$ = this.messageSubject.asObservable();
   messageStatus$ = this.messageStatusSubject.asObservable();
@@ -47,13 +49,14 @@ export class WebSocketService {
   newConversation$ = this.newConversationSubject.asObservable();
   conversationUpdate$ = this.conversationUpdateSubject.asObservable();
   participantRemoved$ = this.participantRemovedSubject.asObservable();
+  storyView$ = this.storyViewSubject.asObservable();
 
   constructor(
     private tokenService: TokenService,
     private presenceService: PresenceService,
     private typingIndicatorService: TypingIndicatorService,
     private callService: CallService
-  ) { }
+  ) { console.log("Constructing Websocket Service..."); }
 
   connect(): void {
     const token = this.tokenService.getAccessToken();
@@ -95,6 +98,9 @@ export class WebSocketService {
         // Always forward full payload for all events
         this.conversationUpdateSubject.next(payload);
       });
+      this.stompClient?.subscribe(`/user/queue/story-views`, (message: IMessage) => {
+        this.storyViewSubject.next(JSON.parse(message.body));
+      });
       this.presenceService.initialize(this.stompClient!);
       this.typingIndicatorService.initialize(this.stompClient!, parseInt(userId));
       this.callService.initialize(this.stompClient!);
@@ -103,11 +109,11 @@ export class WebSocketService {
     this.stompClient.activate();
   }
 
-  sendReaction(conversationId: number, messageId: number, emoji: string, action: 'add' | 'remove'): void {
+  sendReaction(conversationId: number, messageId: number, emoji: string, action: 'add' | 'remove', attachmentId?: number | null): void {
     if (this.stompClient?.connected) {
       this.stompClient.publish({
         destination: '/app/chat.reaction',
-        body: JSON.stringify({ messageId, conversationId, emoji, action })
+        body: JSON.stringify({ messageId, conversationId, emoji, action, attachmentId: attachmentId ?? null })
       });
     }
   }

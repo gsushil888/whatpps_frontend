@@ -1,19 +1,21 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { AfterViewInit, Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Client } from '@stomp/stompjs';
 import { Subscription } from 'rxjs';
 import { AuthService } from 'src/app/core/services/auth.service';
 import { TokenService } from 'src/app/core/services/token.service';
 import { LoaderService } from 'src/app/shared/services/loader.service';
 import { ToastService } from 'src/app/shared/services/toast.service';
 import { ViewportService } from 'src/app/shared/services/viewport.service';
+import { environment } from 'src/environments/environment';
+
+declare const google: any;
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
 })
-export class LoginComponent implements OnInit, OnDestroy {
+export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
   loginForm!: FormGroup;
   isUsernameFlow = false;
   isMobileFlow = false;
@@ -51,6 +53,43 @@ export class LoginComponent implements OnInit, OnDestroy {
         }
       });
     }
+
+    google.accounts.id.initialize({
+      client_id: environment.googleClientId,
+      callback: (response: any) => {
+        console.log('Google idToken received:', response.credential);
+        this.handleGoogleToken(response.credential);
+      }
+    });
+  }
+
+  ngAfterViewInit(): void {
+    google.accounts.id.renderButton(
+      document.getElementById('google-btn'),
+      { theme: 'outline', size: 'large', width: '100%', text: 'signin_with' }
+    );
+  }
+
+  private handleGoogleToken(idToken: string): void {
+    this.loader.showSpinner();
+    this.authService.googleLogin(idToken).subscribe({
+      next: (res) => {
+        this.loader.hideSpinner();
+        if (res.success) {
+          this.tokenService.setAccessToken(res.data.session.accessToken);
+          this.tokenService.setRefreshToken(res.data.session.refreshToken);
+          if (res.data.user?.id) {
+            localStorage.setItem('userId', res.data.user.id.toString());
+          }
+          this.toast.success(res.message || 'Google login successful');
+          this.router.navigate(['/home']);
+        }
+      },
+      error: (err) => {
+        this.loader.hideSpinner();
+        this.toast.error(err.error?.message || 'Google login failed');
+      }
+    });
   }
 
   private initializeForm(): void {
@@ -61,7 +100,6 @@ export class LoginComponent implements OnInit, OnDestroy {
       mobile: ['', [Validators.pattern(/^\d{10}$/)]],
     });
 
-    // subscribe to viewport service
     this.sub = this.viewport.isMobileView$.subscribe(
       (val) => (this.isMobileView = val)
     );
@@ -73,7 +111,6 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (username && this.loginForm.get('username')?.dirty) {
       this.isUsernameFlow = true;
       this.isMobileFlow = false;
-
       this.loginForm.get('mobile')?.reset();
       this.loginForm.get('password')?.setValidators([
         Validators.required,
@@ -93,7 +130,6 @@ export class LoginComponent implements OnInit, OnDestroy {
     if (mobile && this.loginForm.get('mobile')?.dirty) {
       this.isMobileFlow = true;
       this.isUsernameFlow = false;
-
       this.loginForm.get('username')?.reset();
       this.loginForm.get('password')?.reset();
     } else {
@@ -134,9 +170,7 @@ export class LoginComponent implements OnInit, OnDestroy {
       });
     } else if (this.isMobileFlow && this.loginForm.get('mobile')?.valid) {
       this.loader.showSpinner();
-      const payload = {
-        mobile: this.loginForm.value.mobile
-      };
+      const payload = { mobile: this.loginForm.value.mobile };
       this.authService.login(payload).subscribe({
         next: (response) => {
           this.loader.hideSpinner();
@@ -164,22 +198,7 @@ export class LoginComponent implements OnInit, OnDestroy {
     }
   }
 
-  // =======
-
-
-  private stompClient!: Client;
-
-  loginWithGoogle() {
-    this.router.navigate(['/home']);
-  }
-
   ngOnDestroy(): void {
     if (this.sub) this.sub.unsubscribe();
-    if (this.stompClient) {
-      this.stompClient.deactivate();
-    }
   }
-
-
-
 }

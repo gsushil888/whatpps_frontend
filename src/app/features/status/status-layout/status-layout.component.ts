@@ -16,6 +16,7 @@ export class StatusLayoutComponent implements OnInit {
   constructor(private statusService: StatusService, private router: Router) { }
 
   ngOnInit() {
+    console.log("Constructed StatusLayout Component...");
     this.statusService.selectedStatusId$.subscribe(id => { this.selectedStatusId = id; });
   }
 

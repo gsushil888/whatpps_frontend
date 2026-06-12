@@ -9,9 +9,10 @@ export class UserProfileComponent implements OnInit {
   @Output() close = new EventEmitter<void>();
   currentUser: UserProfile | null = null;
 
-  constructor(private userService: UserService) {}
+  constructor(private userService: UserService) { }
 
   ngOnInit() {
+    console.log("Constructed UserProfile Component...");
     this.userService.currentUser$.subscribe(user => {
       this.currentUser = user;
     });

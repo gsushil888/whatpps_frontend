@@ -1,17 +1,19 @@
-import { ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { PresenceService } from 'src/app/core/services/presence.service';
 import { TokenService } from 'src/app/core/services/token.service';
 import { TypingIndicatorService, TypingUser } from 'src/app/core/services/typing-indicator.service';
+import { ToastService } from 'src/app/shared/services/toast.service';
 import { CallService } from '../../call/services/call.service';
 import { Chat, ChatService } from '../services/chat.service';
-import { ConversationMessage, ConversationService } from '../services/conversation.service';
+import { ConversationMessage, ConversationService, MessageAttachment } from '../services/conversation.service';
 import { WebSocketService } from '../services/websocket.service';
 
 @Component({
   selector: 'app-chat-window',
-  templateUrl: './chat-window.component.html'
+  templateUrl: './chat-window.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ChatWindowComponent implements OnInit, OnDestroy {
   @Input() isMobile = false;
@@ -22,6 +24,8 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   newMessage: string = '';
   showAttachmentModal = false;
   showChatInfo = false;
+  pendingMediaFiles: { file: File; previewUrl: string; caption: string }[] = [];
+  showMediaPreview = false;
   showMenuModal = false;
   showSearch = false;
   showMore = false;
@@ -49,7 +53,13 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   typingList: TypingUser[] = [];
   private isAutoScrolling = false;
   activeReactionMsgId: number | null = null;
+  activeReactionAttachment: { msgId: number; index: number } | null = null;
+  hoveredAttachment: { msgId: number; index: number } | null = null;
   readonly REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+  lightboxAttachments: any[] = [];
+  lightboxIndex = 0;
+  showLightbox = false;
+  expandedMsgId: number | null = null;
 
   @ViewChild('video') videoElement!: ElementRef<HTMLVideoElement>;
   @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
@@ -62,10 +72,12 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     private presenceService: PresenceService,
     private typingIndicatorService: TypingIndicatorService,
     private cdr: ChangeDetectorRef,
-    private callService: CallService
+    private callService: CallService,
+    private toastService: ToastService
   ) { }
 
   ngOnInit(): void {
+    console.log("ChatWindow constructed...");
     this.chatService.selectedChatId$
       .pipe(takeUntil(this.destroy$))
       .subscribe(chatId => {
@@ -134,6 +146,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
           this.isTyping = this.typingIndicatorService.isAnyoneTyping(parseInt(this.chatId));
           this.typingText = this.typingIndicatorService.getTypingText(parseInt(this.chatId));
           this.typingList = this.typingIndicatorService.getTypingList(parseInt(this.chatId));
+          this.cdr.markForCheck();
           if (this.isTyping) {
             setTimeout(() => this.scrollToBottom(), 100);
           }
@@ -201,7 +214,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       this.messages = [];
       this.hasMoreMessages = true;
       this.isLoadingMessages = true;
-      this.conversationService.getConversationMessages(this.chatId, 50)
+      this.conversationService.getConversationMessages(this.chatId, 200)
         .pipe(takeUntil(this.destroy$))
         .subscribe({
           next: (response) => {
@@ -209,14 +222,15 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
               this.messages = response.data.messages.reverse();
               this.hasMoreMessages = response.data.pagination.hasNext;
               setTimeout(() => this.scrollToBottom(), 0);
-              // Mark all unread messages as READ
               this.markUnreadMessagesAsRead();
             }
             this.isLoadingMessages = false;
+            this.cdr.markForCheck();
           },
           error: (err) => {
             console.error('Error loading messages:', err);
             this.isLoadingMessages = false;
+            this.cdr.markForCheck();
           }
         });
 
@@ -400,9 +414,11 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       } : undefined,
       mediaUrl: message.mediaUrl,
       isUploading: message.isUploading || false,
+      attachments: message.attachments || undefined,
       createdAt: message.createdAt || new Date().toISOString()
     };
-    this.messages.push(newMessage);
+    this.messages = [...this.messages, newMessage];
+    this.cdr.markForCheck();
 
     if (this.chatId && newMessage.createdAt) {
       this.chatService.updateChatLastMessage(
@@ -415,7 +431,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       );
     }
 
-    setTimeout(() => this.scrollToBottom(), 100);
+    setTimeout(() => this.scrollToBottom(), 0);
   }
 
   // ---------------------- Attachments ----------------------
@@ -484,42 +500,163 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
   onFileSelected(event: Event) {
     const input = event.target as HTMLInputElement;
-    if (input.files && input.files.length > 0 && this.chatId) {
-      const file = input.files[0];
-      this.closeAttachmentModal();
-      if (file.type.startsWith('image/')) {
-        this.processImageUpload(file);
-      } else {
-        this.startUpload(file, input);
-      }
+    if (!input.files || input.files.length === 0 || !this.chatId) return;
+
+    const files = Array.from(input.files);
+    this.pendingMediaFiles = files.map(file => ({
+      file,
+      previewUrl: (file.type.startsWith('image/') || file.type.startsWith('video/'))
+        ? URL.createObjectURL(file)
+        : '',
+      caption: ''
+    }));
+
+    this.closeAttachmentModal();
+    if (this.pendingMediaFiles.length === 1 && !files[0].type.startsWith('image/') && !files[0].type.startsWith('video/')) {
+      this.startUpload(files[0], input);
+      this.pendingMediaFiles = [];
+    } else {
+      this.showMediaPreview = true;
+      this.cdr.markForCheck();
     }
+    input.value = '';
+  }
+
+  removeMediaFile(index: number) {
+    const removed = this.pendingMediaFiles.splice(index, 1);
+    if (removed[0]?.previewUrl.startsWith('blob:')) URL.revokeObjectURL(removed[0].previewUrl);
+    if (this.pendingMediaFiles.length === 0) this.showMediaPreview = false;
+  }
+
+  sendPendingMedia() {
+    if (!this.chatId || this.pendingMediaFiles.length === 0) return;
+    this.showMediaPreview = false;
+    const items = [...this.pendingMediaFiles];
+    this.pendingMediaFiles = [];
+    const caption = items[0].caption || '';
+
+    // Show optimistic uploading bubble
+    const firstItem = items[0];
+    this.isUploadingFile = true;
+    if (firstItem.file.type.startsWith('image/')) {
+      this.uploadingImagePreview = firstItem.previewUrl;
+    }
+    this.addMessageToList({
+      senderId: parseInt(this.tokenService.getUserId()!),
+      senderName: 'You',
+      senderMobileNumber: '',
+      senderAvatar: '',
+      content: caption,
+      messageType: items[0].file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE',
+      isEdited: false,
+      deliveryStatus: { read: 0, delivered: 0, sent: 0 },
+      reactions: [],
+      mediaMetadata: { thumbnail: firstItem.previewUrl, fileName: firstItem.file.name, size: firstItem.file.size, mimeType: firstItem.file.type },
+      attachments: [],
+      isUploading: true,
+      createdAt: new Date().toISOString()
+    }, false);
+
+    this.conversationService.uploadMediaBatch(this.chatId, items.map(i => i.file))
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
+
+          if (!res.success) {
+            this.messages = this.messages.map(m => m.isUploading ? { ...m, isUploading: false, isFailed: true } : m);
+            this.cdr.markForCheck();
+            return;
+          }
+
+          const uploadedFiles: any[] = res.data.files;
+          const attachments: MessageAttachment[] = uploadedFiles.map((f: any) => ({
+            fileUrl: f.fileUrl,
+            type: this.getMessageType(f.mimeType),
+            width: f.width || null,
+            height: f.height || null,
+            duration: f.duration || null,
+            thumbnailUrl: f.thumbnailUrl || f.fileUrl,
+            fileName: f.fileName,
+            mimeType: f.mimeType,
+            size: f.fileSize
+          }));
+
+          const dominantType = attachments.some(a => a.type === 'VIDEO') ? 'VIDEO' : 'IMAGE';
+
+          // Replace the optimistic bubble with the real message in one shot
+          const finalMsg: ConversationMessage = {
+            senderId: parseInt(this.tokenService.getUserId()!),
+            senderName: 'You',
+            senderMobileNumber: '',
+            senderAvatar: '',
+            content: caption,
+            messageType: dominantType,
+            isEdited: false,
+            deliveryStatus: { read: 0, delivered: 0, sent: 1 },
+            reactions: [],
+            mediaUrl: attachments[0].fileUrl,
+            mediaMetadata: { thumbnail: attachments[0].thumbnailUrl || attachments[0].fileUrl, fileName: attachments[0].fileName || '', size: attachments[0].size || 0, mimeType: attachments[0].mimeType || '' },
+            attachments,
+            createdAt: new Date().toISOString()
+          };
+          this.messages = [...this.messages.filter(m => !m.isUploading), finalMsg];
+          this.cdr.markForCheck();
+          setTimeout(() => this.scrollToBottom(), 0);
+
+          this.chatService.updateChatLastMessage(this.chatId!, caption, dominantType, finalMsg.createdAt, finalMsg.senderId, finalMsg.senderName);
+
+          this.webSocketService.sendMessage(parseInt(this.chatId!), {
+            messageType: dominantType,
+            content: caption,
+            attachments,
+            replyToMessageId: null
+          });
+        },
+        error: (err) => {
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
+          this.messages = this.messages.map(m => m.isUploading ? { ...m, isUploading: false, isFailed: true } : m);
+          this.cdr.markForCheck();
+          this.toastService.error('Failed to upload files: ' + (err.error?.message || err.message));
+        }
+      });
   }
 
   private processImageUpload(file: File) {
-    this.isUploadingFile = true;
     const reader = new FileReader();
     reader.onload = (e) => {
-      this.uploadingImagePreview = e.target?.result as string;
-      this.addMessageToList({
-        senderId: parseInt(this.tokenService.getUserId()!),
-        senderName: 'You',
-        senderMobileNumber: '',
-        senderAvatar: '',
-        content: '',
-        messageType: 'IMAGE',
-        isEdited: false,
-        deliveryStatus: { read: 0, delivered: 0, sent: 0 },
-        reactions: [],
-        mediaMetadata: { thumbnail: this.uploadingImagePreview, fileName: file.name, size: file.size, mimeType: file.type },
-        isUploading: true,
-        createdAt: new Date().toISOString()
-      }, false);
-      setTimeout(() => this.startUpload(file, null), 2000);
+      this.processImageUploadWithCaption(file, e.target?.result as string, '');
     };
     reader.readAsDataURL(file);
   }
 
-  private startUpload(file: File, input: HTMLInputElement | null) {
+  private processImageUploadWithCaption(file: File, previewUrl: string, caption: string) {
+    this.isUploadingFile = true;
+    this.uploadingImagePreview = previewUrl;
+    this.addMessageToList({
+      senderId: parseInt(this.tokenService.getUserId()!),
+      senderName: 'You',
+      senderMobileNumber: '',
+      senderAvatar: '',
+      content: caption,
+      messageType: 'IMAGE',
+      isEdited: false,
+      deliveryStatus: { read: 0, delivered: 0, sent: 0 },
+      reactions: [],
+      mediaMetadata: { thumbnail: previewUrl, fileName: file.name, size: file.size, mimeType: file.type },
+      isUploading: true,
+      createdAt: new Date().toISOString()
+    }, false);
+    setTimeout(() => this.startUploadWithCaption(file, caption), 0);
+  }
+
+  private startUploadWithCaption(file: File, caption: string) {
+    this.startUpload(file, null, caption);
+  }
+
+  private startUpload(file: File, input: HTMLInputElement | null, caption: string = '') {
     console.log('Upload started, isUploadingFile:', this.isUploadingFile);
 
     this.conversationService.uploadMedia(this.chatId!, file)
@@ -532,51 +669,42 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
 
           if (response.success) {
             const messageType = this.getMessageType(file.type);
-            const message: any = {
-              messageType: messageType,
-              content: '',
-              mediaUrl: response.data.fileUrl,
-              mediaMetadata: {
-                fileName: response.data.fileName,
-                size: response.data.fileSize,
-                mimeType: response.data.mimeType,
-                thumbnail: response.data.thumbnailUrl || response.data.fileUrl
-              },
-              replyToMessageId: null
+            const mediaMetadata = {
+              fileName: response.data.fileName,
+              size: response.data.fileSize,
+              mimeType: response.data.mimeType,
+              thumbnail: response.data.thumbnailUrl || response.data.fileUrl,
+              width: response.data.width || null,
+              height: response.data.height || null,
+              duration: response.data.duration || null
             };
 
-            if (messageType === 'IMAGE' || messageType === 'VIDEO') {
-              message.mediaMetadata.width = response.data.width || null;
-              message.mediaMetadata.height = response.data.height || null;
-            }
-
-            if (messageType === 'VIDEO' || messageType === 'AUDIO') {
-              message.mediaMetadata.duration = response.data.duration || null;
-            }
-
-            // Remove uploading message and add final message
-            const uploadingIndex = this.messages.findIndex(m => m.isUploading);
-            if (uploadingIndex !== -1) {
-              this.messages.splice(uploadingIndex, 1);
-            }
-
-            // Add final message
-            this.addMessageToList({
+            const finalMsg: ConversationMessage = {
               senderId: parseInt(this.tokenService.getUserId()!),
               senderName: 'You',
               senderMobileNumber: '',
               senderAvatar: '',
-              content: message.content,
-              messageType: message.messageType,
+              content: caption,
+              messageType,
               isEdited: false,
               deliveryStatus: { read: 0, delivered: 0, sent: 1 },
               reactions: [],
-              mediaUrl: message.mediaUrl,
-              mediaMetadata: message.mediaMetadata,
+              mediaUrl: response.data.fileUrl,
+              mediaMetadata,
               createdAt: new Date().toISOString()
-            }, false);
+            };
+            this.messages = [...this.messages.filter(m => !m.isUploading), finalMsg];
+            this.cdr.markForCheck();
+            setTimeout(() => this.scrollToBottom(), 0);
+            this.chatService.updateChatLastMessage(this.chatId!, caption, messageType, finalMsg.createdAt, finalMsg.senderId, finalMsg.senderName);
 
-            this.webSocketService.sendMessage(parseInt(this.chatId!), message);
+            this.webSocketService.sendMessage(parseInt(this.chatId!), {
+              messageType,
+              content: caption,
+              mediaUrl: response.data.fileUrl,
+              mediaMetadata,
+              replyToMessageId: null
+            });
           }
           if (input) input.value = '';
         },
@@ -584,14 +712,9 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
           console.error('Error uploading file:', err);
           this.isUploadingFile = false;
           this.uploadingImagePreview = null;
-
-          // Remove uploading message on error
-          const uploadingIndex = this.messages.findIndex(m => m.isUploading);
-          if (uploadingIndex !== -1) {
-            this.messages.splice(uploadingIndex, 1);
-          }
-
-          alert('Failed to upload file: ' + (err.error?.message || err.message));
+          this.messages = this.messages.map(m => m.isUploading ? { ...m, isUploading: false, isFailed: true } : m);
+          this.cdr.markForCheck();
+          this.toastService.error('Failed to upload file: ' + (err.error?.message || err.message));
           if (input) input.value = '';
         }
       });
@@ -620,26 +743,106 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     return Array.from(map.entries()).map(([emoji, v]) => ({ emoji, ...v }));
   }
 
+  getMessageLevelReactions(msg: ConversationMessage): { emoji: string; count: number; hasCurrentUser: boolean }[] {
+    return this.getGroupedReactions(msg.reactions.filter(r => !r.attachmentId));
+  }
+
   private handleReactionUpdate(event: any) {
     const msg = this.messages.find(m => m.id === event.messageId);
     if (!msg) return;
-
     const reactorId = event.reactorId ?? event.userId ?? parseInt(this.tokenService.getUserId()!);
     const reactorName = event.reactorName ?? '';
+    const attachmentId = event.attachmentId ?? null;
 
     if (event.action === 'remove') {
-      msg.reactions = msg.reactions.filter(r => !(r.emoji === event.emoji && r.userId === reactorId));
+      msg.reactions = msg.reactions.filter(r =>
+        !(r.emoji === event.emoji && r.userId === reactorId && (r.attachmentId ?? null) === attachmentId)
+      );
     } else {
-      msg.reactions = msg.reactions.filter(r => r.userId !== reactorId);
-      msg.reactions.push({ emoji: event.emoji, userId: reactorId, displayName: reactorName, createdAt: new Date().toISOString() });
+      // remove any previous reaction by this user for same scope (attachment or message)
+      msg.reactions = msg.reactions.filter(r =>
+        !(r.userId === reactorId && (r.attachmentId ?? null) === attachmentId)
+      );
+      msg.reactions.push({ emoji: event.emoji, userId: reactorId, displayName: reactorName, attachmentId, createdAt: new Date().toISOString() });
     }
     this.cdr.markForCheck();
   }
 
   @HostListener('document:click')
-  onDocumentClick() { this.activeReactionMsgId = null; }
+  onDocumentClick() {
+    this.activeReactionMsgId = null;
+    this.activeReactionAttachment = null;
+  }
+
+  toggleExpandGrid(msgId: number | undefined, event: MouseEvent) {
+    event.stopPropagation();
+    this.expandedMsgId = this.expandedMsgId === msgId ? null : (msgId ?? null);
+  }
+
+  openLightbox(attachments: any[], index: number, event: MouseEvent) {
+    event.stopPropagation();
+    this.lightboxAttachments = attachments;
+    this.lightboxIndex = index;
+    this.showLightbox = true;
+  }
+
+  closeLightbox() { this.showLightbox = false; }
+
+  prevSlide(event: MouseEvent) {
+    event.stopPropagation();
+    this.lightboxIndex = (this.lightboxIndex - 1 + this.lightboxAttachments.length) % this.lightboxAttachments.length;
+  }
+
+  nextSlide(event: MouseEvent) {
+    event.stopPropagation();
+    this.lightboxIndex = (this.lightboxIndex + 1) % this.lightboxAttachments.length;
+  }
 
   // ---------------------- Reactions ----------------------
+  toggleAttachmentReactionPicker(msgId: number | undefined, index: number, event: MouseEvent) {
+    event.stopPropagation();
+    if (this.activeReactionAttachment?.msgId === msgId && this.activeReactionAttachment?.index === index) {
+      this.activeReactionAttachment = null;
+    } else {
+      this.activeReactionAttachment = msgId != null ? { msgId, index } : null;
+    }
+  }
+
+  sendAttachmentReaction(msg: ConversationMessage, index: number, emoji: string, event: MouseEvent) {
+    event.stopPropagation();
+    if (!this.chatId || !msg.id) return;
+    const att = msg.attachments?.[index];
+    if (!att) return;
+    const attachmentId = att.id ?? null;
+    const currentUserId = parseInt(this.tokenService.getUserId()!);
+    const existing = msg.reactions.findIndex(r =>
+      r.userId === currentUserId && r.emoji === emoji && (r.attachmentId ?? null) === attachmentId
+    );
+    if (existing !== -1) {
+      msg.reactions.splice(existing, 1);
+      this.webSocketService.sendReaction(parseInt(this.chatId), msg.id, emoji, 'remove', attachmentId);
+    } else {
+      const prevIdx = msg.reactions.findIndex(r =>
+        r.userId === currentUserId && (r.attachmentId ?? null) === attachmentId
+      );
+      if (prevIdx !== -1) {
+        const prevEmoji = msg.reactions[prevIdx].emoji;
+        msg.reactions.splice(prevIdx, 1);
+        this.webSocketService.sendReaction(parseInt(this.chatId), msg.id, prevEmoji, 'remove', attachmentId);
+      }
+      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', attachmentId, createdAt: new Date().toISOString() });
+      this.webSocketService.sendReaction(parseInt(this.chatId), msg.id, emoji, 'add', attachmentId);
+    }
+    this.activeReactionAttachment = null;
+    this.cdr.markForCheck();
+  }
+
+  getGroupedAttachmentReactions(msg: ConversationMessage, att: MessageAttachment): { emoji: string; count: number; hasCurrentUser: boolean }[] {
+    const attachmentId = att.id ?? null;
+    const filtered = msg.reactions.filter(r => (r.attachmentId ?? null) === attachmentId);
+    return this.getGroupedReactions(filtered);
+  }
+
   toggleReactionPicker(msgId: number | undefined, event: MouseEvent) {
     event.stopPropagation();
     this.activeReactionMsgId = this.activeReactionMsgId === msgId ? null : (msgId ?? null);
@@ -657,23 +860,20 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     if (!this.chatId || !msg.id) return;
     const conversationId = parseInt(this.chatId);
     const currentUserId = parseInt(this.tokenService.getUserId()!);
-    const existing = msg.reactions.findIndex(r => r.userId === currentUserId && r.emoji === emoji);
-
+    // message-level reactions: attachmentId === null
+    const existing = msg.reactions.findIndex(r => r.userId === currentUserId && r.emoji === emoji && !r.attachmentId);
     if (existing !== -1) {
-      // Optimistic remove
       msg.reactions.splice(existing, 1);
-      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'remove');
+      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'remove', null);
     } else {
-      // Remove previous reaction by current user if any
-      const prevIdx = msg.reactions.findIndex(r => r.userId === currentUserId);
-      const prevEmoji = prevIdx !== -1 ? msg.reactions[prevIdx].emoji : null;
+      const prevIdx = msg.reactions.findIndex(r => r.userId === currentUserId && !r.attachmentId);
       if (prevIdx !== -1) {
+        const prevEmoji = msg.reactions[prevIdx].emoji;
         msg.reactions.splice(prevIdx, 1);
-        this.webSocketService.sendReaction(conversationId, msg.id, prevEmoji!, 'remove');
+        this.webSocketService.sendReaction(conversationId, msg.id, prevEmoji, 'remove', null);
       }
-      // Optimistic add
-      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', createdAt: new Date().toISOString() });
-      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'add');
+      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', attachmentId: null, createdAt: new Date().toISOString() });
+      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'add', null);
     }
     this.activeReactionMsgId = null;
   }
@@ -681,17 +881,20 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   // ---------------------- Chat Info ----------------------
   toggleChatInfo() {
     this.showChatInfo = !this.showChatInfo;
+    this.cdr.markForCheck();
   }
 
   closeChatInfo() {
     this.showChatInfo = false;
+    this.cdr.markForCheck();
   }
 
   get filteredMessages(): ConversationMessage[] {
     if (!this.searchQuery.trim()) return this.messages;
     const q = this.searchQuery.toLowerCase();
     const results = this.messages.filter(m => m.content?.toLowerCase().includes(q));
-    this.searchResultCount = results.length;
+    // update count without triggering ExpressionChangedAfterItHasBeenCheckedError
+    Promise.resolve().then(() => { this.searchResultCount = results.length; });
     return results;
   }
 
@@ -713,6 +916,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
   viewContact() {
     this.showMenuModal = false;
     this.showChatInfo = true;
+    this.cdr.markForCheck();
   }
 
   openSearch() {
@@ -897,7 +1101,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     this.isLoadingMessages = true;
     const oldestMessageId = this.messages[0]?.id;
 
-    this.conversationService.getConversationMessages(this.chatId, 20, oldestMessageId)
+    this.conversationService.getConversationMessages(this.chatId, 500, oldestMessageId)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response) => {

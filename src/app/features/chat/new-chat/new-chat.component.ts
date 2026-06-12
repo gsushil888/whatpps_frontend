@@ -1,8 +1,9 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { Contact } from 'src/app/core/models/contact.model';
 import { ChatService } from '../services/chat.service';
-import { ContactService, Contact } from '../services/contact.service';
+import { ContactService } from '../services/contact.service';
 import { ConversationService } from '../services/conversation.service';
 
 @Component({
@@ -30,9 +31,10 @@ export class NewChatComponent implements OnInit, OnDestroy {
     private chatService: ChatService,
     private contactService: ContactService,
     private conversationService: ConversationService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
+    console.log("NewChat constructed...");
     this.loadContacts();
   }
 
@@ -45,7 +47,7 @@ export class NewChatComponent implements OnInit, OnDestroy {
     this.contactService.getContacts().subscribe({
       next: (response) => {
         if (response.success) {
-          this.contacts = response.data.contacts.sort((a, b) => 
+          this.contacts = response.data.contacts.sort((a, b) =>
             a.displayName.localeCompare(b.displayName)
           );
         }

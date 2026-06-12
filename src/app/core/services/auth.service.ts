@@ -16,6 +16,10 @@ export class AuthService {
     private tokenService: TokenService
   ) { }
 
+  googleLogin(idToken: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/google`, { idToken });
+  }
+
   register(formData: FormData): Observable<any> {
     return this.http.post(`${this.API_URL}/register`, formData);
   }

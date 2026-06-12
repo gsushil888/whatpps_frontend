@@ -1,46 +1,10 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { environment } from 'src/environments/environment';
 import { TokenService } from 'src/app/core/services/token.service';
+import { environment } from 'src/environments/environment';
+import { AddContactRequest, AddContactResponse, ContactResponse } from '../../../core/models/contact.model';
 
-export interface Contact {
-  id: number;
-  contactUserId: number;
-  customName: string | null;
-  displayName: string;
-  phoneNumber: string;
-  profilePictureUrl: string;
-  isOnline: boolean;
-  isFavorite: boolean;
-  isBlocked: boolean;
-  lastActiveAt: string;
-  createdAt: string;
-}
-
-export interface ContactResponse {
-  success: boolean;
-  data: {
-    contacts: Contact[];
-    totalCount: number;
-    pagination: {
-      page: number;
-      limit: number;
-      hasNext: boolean;
-    };
-  };
-}
-
-export interface AddContactRequest {
-  phoneNumber: string;
-  displayName?: string;
-}
-
-export interface AddContactResponse {
-  success: boolean;
-  message: string;
-  data: Contact;
-}
 
 @Injectable({
   providedIn: 'root'
@@ -51,7 +15,9 @@ export class ContactService {
   constructor(
     private http: HttpClient,
     private tokenService: TokenService
-  ) { }
+  ) {
+    console.log("Constructing Contact Service...");
+  }
 
   getContacts(page: number = 1, limit: number = 50): Observable<ContactResponse> {
     const url = `${this.API_URL}?page=${page}&limit=${limit}`;

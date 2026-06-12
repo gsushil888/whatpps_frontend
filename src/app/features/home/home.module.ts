@@ -6,8 +6,8 @@ import { CallModule } from '../call/call.module';
 
 import { HomeLayoutComponent } from './home-layout/home-layout.component';
 import { HomeRoutingModule } from './home-routing.module';
-import { SidebarComponent } from './sidebar/sidebar.component';
 import { ProfileComponent } from './profile/profile.component';
+import { SidebarComponent } from './sidebar/sidebar.component';
 
 @NgModule({
   declarations: [

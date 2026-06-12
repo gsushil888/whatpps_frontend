@@ -1,4 +1,4 @@
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 
 @Component({
@@ -6,7 +6,7 @@ import { Router } from '@angular/router';
   templateUrl: './problem-page.component.html',
   styleUrls: ['./problem-page.component.css']
 })
-export class ProblemPageComponent {
+export class ProblemPageComponent implements OnInit {
   @Input() title = 'Something went wrong';
   @Input() message = 'We are working on it. Please try again later.';
   @Input() showRetry = true;
@@ -18,6 +18,9 @@ export class ProblemPageComponent {
   constructor(private router: Router) {
     const nav = this.router.getCurrentNavigation();
     this.lastUrl = nav?.previousNavigation?.finalUrl?.toString() || null;
+  }
+  ngOnInit(): void {
+    console.log("Constructed ProblemPage Component...");
   }
 
   // Step 1: Ask for confirmation
