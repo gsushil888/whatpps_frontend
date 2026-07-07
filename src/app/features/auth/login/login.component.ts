@@ -54,20 +54,43 @@ export class LoginComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
 
-    google.accounts.id.initialize({
-      client_id: environment.googleClientId,
-      callback: (response: any) => {
-        console.log('Google idToken received:', response.credential);
-        this.handleGoogleToken(response.credential);
-      }
+    this.waitForGoogle().then(() => {
+      google.accounts.id.initialize({
+        client_id: environment.googleClientId,
+        callback: (response: any) => {
+          this.handleGoogleToken(response.credential);
+        }
+      });
     });
   }
 
   ngAfterViewInit(): void {
-    google.accounts.id.renderButton(
-      document.getElementById('google-btn'),
-      { theme: 'outline', size: 'large', width: '100%', text: 'signin_with' }
-    );
+    this.waitForGoogle().then(() => {
+      google.accounts.id.renderButton(
+        document.getElementById('google-btn'),
+        { theme: 'outline', size: 'large', width: '100%', text: 'signin_with' }
+      );
+    });
+  }
+
+  private waitForGoogle(): Promise<void> {
+    return new Promise(resolve => {
+      if (typeof (window as any).google !== 'undefined') {
+        resolve();
+        return;
+      }
+      const script = document.querySelector('script[src*="accounts.google.com"]');
+      if (script) {
+        script.addEventListener('load', () => resolve());
+      } else {
+        const interval = setInterval(() => {
+          if (typeof (window as any).google !== 'undefined') {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 100);
+      }
+    });
   }
 
   private handleGoogleToken(idToken: string): void {

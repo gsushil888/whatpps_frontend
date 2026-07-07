@@ -1,6 +1,5 @@
 import { Component, OnInit } from '@angular/core';
 import { NavigationCancel, NavigationEnd, NavigationError, NavigationStart, Router } from '@angular/router';
-import { TokenService } from './core/services/token.service';
 import { LoaderService } from './shared/services/loader.service';
 
 @Component({
@@ -9,10 +8,9 @@ import { LoaderService } from './shared/services/loader.service';
 })
 export class AppComponent implements OnInit {
 
-  constructor(private router: Router, private loader: LoaderService, private tokenService: TokenService) { }
+  constructor(private router: Router, private loader: LoaderService) { }
 
   ngOnInit() {
-    this.tokenService.loadFromStorage();
     this.router.events.subscribe(event => {
       if (event instanceof NavigationStart) {
         this.loader.showProgress();

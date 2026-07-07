@@ -81,6 +81,7 @@ export interface ConversationMessage {
   senderName: string;
   senderMobileNumber?: string;
   senderAvatar: string;
+  isContact?: boolean;
   content: string;
   messageType: string;
   replyToMessageId?: number;

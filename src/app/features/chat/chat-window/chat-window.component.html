@@ -108,7 +108,11 @@
                   [class.text-white]="isCurrentUser(msg.senderId)">
 
                   <p *ngIf="shouldShowSenderName(msg, i)" class="text-xs font-semibold mb-1 opacity-80">
-                    {{ getSenderDisplayName(msg) }}
+                    <ng-container *ngIf="msg.isContact !== false">{{ getSenderDisplayName(msg) }}</ng-container>
+                    <ng-container *ngIf="msg.isContact === false">
+                      <span>~{{ msg.senderName }}</span>
+                      <span class="font-normal opacity-70 ml-1">{{ msg.senderMobileNumber }}</span>
+                    </ng-container>
                   </p>
 
                   <!-- Multi-attachment grid (2+ files) -->
@@ -207,11 +211,11 @@
                   <div
                     *ngIf="msg.messageType === 'IMAGE' && msg.mediaMetadata && !(msg.attachments && msg.attachments.length > 1)"
                     class="relative">
-                    <img [src]="msg.mediaMetadata.thumbnail || 'http://localhost:8080' + msg.mediaMetadata.thumbnail"
+                    <img [src]="getMediaUrl(msg.mediaMetadata.thumbnail)"
                       [class.opacity-50]="msg.isUploading || msg.isFailed"
                       [class.blur-sm]="msg.isUploading || msg.isFailed" class="max-w-xs rounded mb-2 cursor-pointer"
                       alt="Image"
-                      (click)="!msg.isUploading && !msg.isFailed && openLightbox([{fileUrl: msg.mediaMetadata.thumbnail, type: 'IMAGE'}], 0, $event)" />
+                      (click)="!msg.isUploading && !msg.isFailed && openLightbox([{fileUrl: getMediaUrl(msg.mediaUrl || msg.mediaMetadata.thumbnail), type: 'IMAGE'}], 0, $event)" />
                     <div *ngIf="msg.isUploading" class="absolute inset-0 flex items-center justify-center">
                       <div class="bg-black bg-opacity-50 rounded-full p-3">
                         <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
@@ -226,30 +230,25 @@
                   </div>
 
                   <!-- Video Message -->
-                  <div
-                    *ngIf="msg.messageType === 'VIDEO' && msg.mediaMetadata && !(msg.attachments && msg.attachments.length > 1)"
+                  <div *ngIf="msg.messageType === 'VIDEO' && !(msg.attachments && msg.attachments.length > 1)"
                     class="relative">
-                    <div class="relative cursor-pointer"
-                      (click)="openLightbox([{fileUrl: msg.mediaUrl, type: 'VIDEO', thumbnailUrl: msg.mediaMetadata.thumbnail}], 0, $event)">
-                      <video [src]="msg.mediaUrl || 'http://localhost:8080' + msg.mediaUrl"
-                        [poster]="msg.mediaMetadata.thumbnail"
-                        class="max-w-xs rounded mb-2 pointer-events-none"></video>
+                    <div class="relative cursor-pointer rounded overflow-hidden bg-black"
+                      style="width:20rem; height:160px;"
+                      (click)="!msg.isUploading && !msg.isFailed && openLightbox([{fileUrl: getVideoUrl(msg), type: 'VIDEO', thumbnailUrl: getVideoThumb(msg)}], 0, $event)">
+                      <video [src]="getVideoUrl(msg)" class="w-full h-full object-cover pointer-events-none"
+                        preload="metadata" muted playsinline></video>
                       <div class="absolute inset-0 flex items-center justify-center">
-                        <div class="bg-black bg-opacity-40 rounded-full p-3">
+                        <div class="bg-black bg-opacity-50 rounded-full p-3">
                           <i class="fas fa-play text-white text-xl"></i>
                         </div>
                       </div>
                       <div *ngIf="msg.isUploading"
-                        class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded">
-                        <div class="bg-black bg-opacity-50 rounded-full p-3">
-                          <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-                        </div>
+                        class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                       </div>
                       <div *ngIf="msg.isFailed"
-                        class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded">
-                        <div class="bg-black bg-opacity-60 rounded-full p-3">
-                          <i class="fas fa-exclamation-triangle text-red-400 text-lg"></i>
-                        </div>
+                        class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded">
+                        <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
                       </div>
                     </div>
                     <p *ngIf="msg.content" class="text-sm mt-1">{{ msg.content }}</p>
@@ -257,8 +256,7 @@
 
                   <!-- Audio Message -->
                   <div *ngIf="msg.messageType === 'AUDIO' && msg.mediaMetadata" class="min-w-[250px]">
-                    <audio [src]="msg.mediaUrl || 'http://localhost:8080' + msg.mediaUrl" controls
-                      class="w-full"></audio>
+                    <audio [src]="getMediaUrl(msg.mediaUrl)" controls class="w-full"></audio>
                     <p *ngIf="msg.content" class="text-sm mt-1">{{ msg.content }}</p>
                   </div>
 

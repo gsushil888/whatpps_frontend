@@ -102,6 +102,10 @@ export class AuthService {
     return this.http.post(`${this.API_URL}/refresh`, { refreshToken });
   }
 
+  refreshTokenWith(refreshToken: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/refresh`, { refreshToken });
+  }
+
   private getDeviceFingerprint(): string {
     return sessionStorage.getItem('deviceFingerprint') || this.generateFingerprint();
   }

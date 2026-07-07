@@ -403,6 +403,7 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
       senderName: message.senderName || 'Unknown',
       senderMobileNumber: message.senderMobileNumber,
       senderAvatar: message.senderAvatar || '',
+      isContact: message.isContact ?? true,
       content: message.content,
       messageType: message.messageType,
       isEdited: false,
@@ -1056,6 +1057,25 @@ export class ChatWindowComponent implements OnInit, OnDestroy {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+
+  getMediaUrl(url: string | null | undefined): string {
+    if (!url) return '';
+    return url.startsWith('http') ? url : 'http://localhost:8080' + url;
+  }
+
+  getVideoUrl(msg: ConversationMessage): string {
+    // prefer attachment fileUrl (single attachment), fallback to mediaUrl
+    const url = msg.attachments?.[0]?.fileUrl || msg.mediaUrl || '';
+    return this.getMediaUrl(url);
+  }
+
+  getVideoThumb(msg: ConversationMessage): string {
+    const thumb = msg.attachments?.[0]?.thumbnailUrl || msg.mediaMetadata?.thumbnail || '';
+    // if thumb is same as video url (no real thumbnail), return empty so no broken poster
+    const videoUrl = msg.attachments?.[0]?.fileUrl || msg.mediaUrl || '';
+    if (thumb === videoUrl) return '';
+    return this.getMediaUrl(thumb);
   }
 
   formatFileSize(bytes: number): string {
