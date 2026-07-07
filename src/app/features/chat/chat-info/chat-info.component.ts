@@ -1,4 +1,6 @@
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
@@ -14,22 +16,22 @@ import { takeUntil } from 'rxjs/operators';
 import {
   ConversationDetail,
   ConversationService,
-  MediaItem,
   Participant
 } from '../services/conversation.service';
 
 import {
-  Contact,
   ContactService
 } from '../services/contact.service';
 
-import { TokenService } from 'src/app/core/services/token.service';
+import { Contact } from '../../../core/models/contact.model';
+import { TokenService } from '../../../core/services/token.service';
 import { WebSocketService } from '../services/websocket.service';
 
 @Component({
   selector: 'app-chat-info',
   templateUrl: './chat-info.component.html',
-  styleUrls: ['./chat-info.component.css']
+  styleUrls: ['./chat-info.component.css'],
+  changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
 
@@ -39,9 +41,11 @@ export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
 
   chatDetail: ConversationDetail | null = null;
 
+  isLoading = false;
+
   currentUserId: number = 0;
 
-  selectedMedia: MediaItem | null = null;
+  selectedMedia: { url: string; thumbnailUrl?: string; type: string; fileName: string } | null = null;
 
   showAllMedia: boolean = false;
 
@@ -63,14 +67,14 @@ export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
     private conversationService: ConversationService,
     private contactService: ContactService,
     private tokenService: TokenService,
-    private webSocketService: WebSocketService
+    private webSocketService: WebSocketService,
+    private cdr: ChangeDetectorRef
   ) { }
 
   ngOnInit(): void {
     this.currentUserId = parseInt(this.tokenService.getUserId() || '0');
     if (this.chatId) this.loadChatDetail();
 
-    // Real-time participant updates
     this.webSocketService.conversationUpdate$
       .pipe(takeUntil(this.destroy$))
       .subscribe(payload => {
@@ -81,7 +85,6 @@ export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
           added.forEach(p => {
             const exists = this.chatDetail!.participants.find(x => x.userId === p.userId);
             if (exists) {
-              // Re-added: clear removed state
               exists.removedByName = null;
               exists.removedAt = null;
             } else {
@@ -101,6 +104,7 @@ export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
             p.removedAt = payload.leftAt || new Date().toISOString();
           }
         }
+        this.cdr.markForCheck();
       });
   }
 
@@ -110,36 +114,31 @@ export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-
-    if (
-      changes['chatId'] &&
-      !changes['chatId'].firstChange
-    ) {
-
+    if (changes['chatId'] && !changes['chatId'].firstChange) {
       this.chatDetail = null;
-
-      if (this.chatId) {
-        this.loadChatDetail();
-      }
+      if (this.chatId) this.loadChatDetail();
     }
   }
 
   loadChatDetail() {
+    this.isLoading = true;
+    this.cdr.markForCheck();
 
     this.conversationService
       .getConversationDetail(this.chatId)
+      .pipe(takeUntil(this.destroy$))
       .subscribe({
         next: (response: any) => {
-
           if (response.success) {
             this.chatDetail = response.data;
           }
+          this.isLoading = false;
+          this.cdr.markForCheck();
         },
         error: (err) => {
-          console.error(
-            'Error loading chat detail:',
-            err
-          );
+          console.error('Error loading chat detail:', err);
+          this.isLoading = false;
+          this.cdr.markForCheck();
         }
       });
   }
@@ -148,181 +147,121 @@ export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
     this.close.emit();
   }
 
-  // ========================================
-  // SORT PARTICIPANTS
-  // ========================================
-
   getSortedParticipants(): Participant[] {
-
-    if (!this.chatDetail) {
-      return [];
-    }
-
-    return [...this.chatDetail.participants]
-      .sort((a, b) => {
-
-        if (a.userId === this.currentUserId) {
-          return -1;
-        }
-
-        if (b.userId === this.currentUserId) {
-          return 1;
-        }
-
-        return 0;
-      });
+    if (!this.chatDetail) return [];
+    return [...this.chatDetail.participants].sort((a, b) => {
+      if (a.userId === this.currentUserId) return -1;
+      if (b.userId === this.currentUserId) return 1;
+      return 0;
+    });
   }
 
-  // ========================================
-  // MEDIA
-  // ========================================
-
-  openMediaModal(media: MediaItem) {
+  openMediaModal(media: { url: string; thumbnailUrl?: string; type: string; fileName: string; messageId: number }) {
     this.selectedMedia = media;
+    this.cdr.markForCheck();
   }
 
   closeMediaModal() {
     this.selectedMedia = null;
+    this.cdr.markForCheck();
   }
 
   openAllMedia() {
     this.showAllMedia = true;
+    this.cdr.markForCheck();
   }
 
   closeAllMedia() {
     this.showAllMedia = false;
+    this.cdr.markForCheck();
   }
 
-  // ========================================
-  // ADD PARTICIPANTS
-  // ========================================
-
   openAddParticipantsModal() {
-
-    if (this.chatDetail?.type !== 'GROUP') {
-      return;
-    }
-
+    if (this.chatDetail?.type !== 'GROUP') return;
     this.showAddParticipantsModal = true;
-
     this.loadAvailableContacts();
+    this.cdr.markForCheck();
   }
 
   closeAddParticipantsModal() {
-
     this.showAddParticipantsModal = false;
-
     this.selectedParticipantIds = [];
+    this.cdr.markForCheck();
   }
 
   loadAvailableContacts() {
     this.contactService.getContacts().subscribe({
       next: (response: any) => {
-        // Only exclude active (non-removed) participants
         const activeParticipantIds = this.chatDetail?.participants
           .filter(p => !p.removedByName)
           .map(p => p.userId) || [];
         this.availableContacts = response.data.contacts.filter(
           (c: Contact) => !activeParticipantIds.includes(c.contactUserId)
         );
+        this.cdr.markForCheck();
       },
       error: (err) => console.error('Error loading contacts:', err)
     });
   }
 
   toggleParticipant(contact: Contact) {
-
-    const index =
-      this.selectedParticipantIds.indexOf(
-        contact.contactUserId
-      );
-
+    const index = this.selectedParticipantIds.indexOf(contact.contactUserId);
     if (index > -1) {
-
-      this.selectedParticipantIds.splice(
-        index,
-        1
-      );
-
+      this.selectedParticipantIds.splice(index, 1);
     } else {
-
-      this.selectedParticipantIds.push(
-        contact.contactUserId
-      );
+      this.selectedParticipantIds.push(contact.contactUserId);
     }
+    this.cdr.markForCheck();
   }
 
   addParticipants() {
-
-    if (!this.chatDetail) {
-      return;
-    }
-
+    if (!this.chatDetail) return;
     this.addingParticipants = true;
-
-    const payload = {
-      userIds: this.selectedParticipantIds
-    };
+    this.cdr.markForCheck();
 
     this.conversationService
-      .addParticipants(
-        this.chatDetail.id,
-        payload
-      )
+      .addParticipants(this.chatDetail.id, { userIds: this.selectedParticipantIds })
       .subscribe({
         next: (response: any) => {
-
           this.addingParticipants = false;
-
           if (response.success) {
-
-            const newParticipants: Participant[] =
-              response.data.addedParticipants || [];
-
-            this.chatDetail?.participants.push(
-              ...newParticipants
-            );
-
+            const newParticipants: Participant[] = response.data.addedParticipants || [];
+            this.chatDetail?.participants.push(...newParticipants);
             this.closeAddParticipantsModal();
           }
+          this.cdr.markForCheck();
         },
         error: (err) => {
-
           this.addingParticipants = false;
-
-          console.error(
-            'Error adding participants:',
-            err
-          );
+          console.error('Error adding participants:', err);
+          this.cdr.markForCheck();
         }
       });
   }
-
-  // ========================================
-  // REMOVE PARTICIPANT
-  // ========================================
 
   removeParticipant(participant: Participant) {
     if (!this.chatDetail) return;
     if (!confirm(`Remove ${participant.displayName} from group?`)) return;
 
     this.removingParticipantIds.push(participant.userId);
+    this.cdr.markForCheck();
 
     this.conversationService.removeParticipant(this.chatDetail.id, participant.userId).subscribe({
       next: (response: any) => {
         this.removingParticipantIds = this.removingParticipantIds.filter(id => id !== participant.userId);
         if (response.success) {
-          // Mark as removed in place — do NOT filter out
           const p = this.chatDetail!.participants.find(x => x.userId === participant.userId);
           if (p) {
             p.removedByName = 'You';
             p.removedAt = new Date().toISOString();
           }
         }
+        this.cdr.markForCheck();
       },
       error: (err) => {
         this.removingParticipantIds = this.removingParticipantIds.filter(id => id !== participant.userId);
         console.error('Error removing participant:', err);
+        this.cdr.markForCheck();
       }
     });
   }
@@ -345,6 +284,21 @@ export class ChatInfoComponent implements OnInit, OnChanges, OnDestroy {
 
   get currentUserRole(): string {
     return this.currentUserParticipant?.participantRole || 'MEMBER';
+  }
+
+  get flatMediaItems(): { url: string; thumbnailUrl?: string; type: string; fileName: string; messageId: number }[] {
+    if (!this.chatDetail?.media) return [];
+    const result: { url: string; thumbnailUrl?: string; type: string; fileName: string; messageId: number }[] = [];
+    for (const msg of this.chatDetail.media) {
+      if (msg.items && msg.items.length > 0) {
+        for (const item of msg.items) {
+          result.push({ url: item.url, thumbnailUrl: item.thumbnailUrl, type: item.type, fileName: item.fileName, messageId: msg.messageId });
+        }
+      } else {
+        result.push({ url: msg.url, thumbnailUrl: msg.thumbnailUrl, type: msg.type, fileName: msg.fileName, messageId: msg.messageId });
+      }
+    }
+    return result;
   }
 
   canRemoveParticipant(participant: Participant): boolean {

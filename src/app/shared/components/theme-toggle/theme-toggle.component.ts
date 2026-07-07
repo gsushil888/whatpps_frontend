@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
 import { ThemeService } from '../../services/theme.service';
@@ -22,6 +22,8 @@ export class ThemeToggleComponent implements OnInit, OnDestroy {
   constructor(private themeService: ThemeService) { }
 
   ngOnInit(): void {
+    console.log("Constructed Theme Toggle Component...");
+
     this.themeService.isDarkMode$.pipe(
       takeUntil(this.destroy$)
     ).subscribe(isDark => {

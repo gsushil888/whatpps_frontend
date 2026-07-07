@@ -1,4 +1,17 @@
-<div class="flex flex-col h-full" *ngIf="chatDetail">
+<!-- Loading state -->
+<div *ngIf="isLoading" class="flex flex-col h-full">
+  <div class="h-16 px-4 flex items-center gap-4 border-b bg-gray-50 dark:bg-gray-700 border-gray-200 dark:border-gray-600">
+    <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors" (click)="onClose()">
+      <i class="fas fa-arrow-left text-gray-700 dark:text-gray-300"></i>
+    </button>
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Info</h2>
+  </div>
+  <div class="flex-1 flex items-center justify-center">
+    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+  </div>
+</div>
+
+<div class="flex flex-col h-full" *ngIf="!isLoading && chatDetail">
 
   <!-- Header -->
   <div
@@ -159,12 +172,9 @@
         Media, links and docs
       </p>
 
-      <div class="flex flex-wrap gap-1" *ngIf="
-          chatDetail.media &&
-          chatDetail.media.length > 0
-        ">
+      <div class="flex flex-wrap gap-1" *ngIf="flatMediaItems.length > 0">
 
-        <div *ngFor="let item of chatDetail.media.slice(0, 10)"
+        <div *ngFor="let item of flatMediaItems.slice(0, 10)"
           class="w-20 h-20 bg-gray-200 dark:bg-gray-600 rounded overflow-hidden cursor-pointer flex-shrink-0"
           (click)="openMediaModal(item)">
 
@@ -174,11 +184,8 @@
 
           <!-- VIDEO -->
           <div *ngIf="item.type === 'VIDEO'" class="relative w-full h-full">
-
             <img [src]="item.thumbnailUrl" class="w-full h-full object-cover" [alt]="item.fileName" />
-
-            <i
-              class="fas fa-play-circle absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-2xl"></i>
+            <i class="fas fa-play-circle absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white text-2xl"></i>
           </div>
 
           <!-- DOCUMENT -->
@@ -189,18 +196,15 @@
         </div>
 
         <!-- More -->
-        <button *ngIf="chatDetail.media.length > 10"
+        <button *ngIf="chatDetail.mediaCount > 10"
           class="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center flex-shrink-0 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           (click)="openAllMedia()">
-          <i class="fas fa-chevron-right text-gray-600 dark:text-gray-400 text-xl"></i>
+          <span class="text-xs text-gray-500 dark:text-gray-400 font-medium">+{{ chatDetail.mediaCount - 10 }}</span>
         </button>
       </div>
 
       <!-- Empty -->
-      <p *ngIf="
-          !chatDetail.media ||
-          chatDetail.media.length === 0
-        " class="text-xs text-gray-500 dark:text-gray-400">
+      <p *ngIf="flatMediaItems.length === 0" class="text-xs text-gray-500 dark:text-gray-400">
         No media yet
       </p>
     </div>
@@ -391,7 +395,7 @@
       <div class="px-4 py-3 border-b dark:border-gray-700 flex items-center justify-between">
 
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          Media ({{ chatDetail.media.length }})
+          Media ({{ chatDetail.mediaCount }})
         </h2>
 
         <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors"
@@ -406,7 +410,7 @@
 
         <div class="grid grid-cols-3 gap-2">
 
-          <div *ngFor="let item of chatDetail.media.slice(0, 10)"
+          <div *ngFor="let item of flatMediaItems"
             class="aspect-square bg-gray-200 dark:bg-gray-600 rounded overflow-hidden cursor-pointer"
             (click)="openMediaModal(item); closeAllMedia()">
 

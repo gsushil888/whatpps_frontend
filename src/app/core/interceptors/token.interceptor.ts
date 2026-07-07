@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpEvent, HttpHandler, HttpInterceptor, HttpRequest } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
-import { BehaviorSubject, Observable, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, from, throwError } from 'rxjs';
 import { catchError, filter, switchMap, take } from 'rxjs/operators';
 import { AuthService } from '../services/auth.service';
 import { TokenService } from '../services/token.service';
@@ -29,7 +29,8 @@ export class TokenInterceptor implements HttpInterceptor {
       this.isRefreshing = true;
       this.refreshTokenSubject.next(null);
 
-      return this.authService.refreshToken().pipe(
+      return from(this.tokenService.getRefreshTokenAsync()).pipe(
+        switchMap(refreshToken => this.authService.refreshTokenWith(refreshToken!)),
         switchMap((response: any) => {
           this.isRefreshing = false;
           if (response.success) {

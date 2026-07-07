@@ -11,7 +11,7 @@ import { Toast, ToastService } from '../../services/toast.service';
              'bg-red-500': toast.type === 'error',
              'bg-blue-500': toast.type === 'info'
            }"
-           class="text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[300px] animate-slide-in">
+           class="text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 max-w-sm w-max animate-slide-in">
         <span>{{ toast.message }}</span>
         <button (click)="toastService.remove(toast.id)" class="ml-auto text-white hover:text-gray-200">✕</button>
       </div>
@@ -30,9 +30,10 @@ import { Toast, ToastService } from '../../services/toast.service';
 export class ToastComponent implements OnInit {
   toasts: Toast[] = [];
 
-  constructor(public toastService: ToastService) {}
+  constructor(public toastService: ToastService) { }
 
-  ngOnInit() {
+  ngOnInit(): void {
+    console.log("Constructed Toast Component...");
     this.toastService.getToasts().subscribe(toasts => this.toasts = toasts);
   }
 }

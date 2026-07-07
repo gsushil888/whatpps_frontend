@@ -16,6 +16,10 @@ export class AuthService {
     private tokenService: TokenService
   ) { }
 
+  googleLogin(idToken: string): Observable<any> {
+    return this.http.post(`${this.API_URL}/google`, { idToken });
+  }
+
   register(formData: FormData): Observable<any> {
     return this.http.post(`${this.API_URL}/register`, formData);
   }
@@ -95,6 +99,10 @@ export class AuthService {
 
   refreshToken(): Observable<any> {
     const refreshToken = this.tokenService.getRefreshToken();
+    return this.http.post(`${this.API_URL}/refresh`, { refreshToken });
+  }
+
+  refreshTokenWith(refreshToken: string): Observable<any> {
     return this.http.post(`${this.API_URL}/refresh`, { refreshToken });
   }
 

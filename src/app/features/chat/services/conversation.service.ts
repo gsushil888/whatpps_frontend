@@ -62,12 +62,26 @@ export interface MessageResponse {
   };
 }
 
+export interface MessageAttachment {
+  id?: number;
+  fileUrl: string;
+  type: string;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+  thumbnailUrl?: string | null;
+  fileName?: string;
+  size?: number;
+  mimeType?: string;
+}
+
 export interface ConversationMessage {
   id?: number;
   senderId: number;
   senderName: string;
   senderMobileNumber?: string;
   senderAvatar: string;
+  isContact?: boolean;
   content: string;
   messageType: string;
   replyToMessageId?: number;
@@ -85,7 +99,9 @@ export interface ConversationMessage {
     thumbnail: string;
   };
   mediaUrl?: string;
+  attachments?: MessageAttachment[];
   isUploading?: boolean;
+  isFailed?: boolean;
   imageLoaded?: boolean;
   createdAt: string;
 }
@@ -94,6 +110,7 @@ export interface MessageReaction {
   emoji: string;
   userId: number;
   displayName: string;
+  attachmentId?: number | null;
   createdAt: string;
 }
 
@@ -103,6 +120,9 @@ export interface ConversationDetail {
   type: string;
   description?: string;
   groupPictureUrl?: string;
+  mobileNumber?: string;
+  participantCount?: number | null;
+  mediaCount: number;
   participants: Participant[];
   settings: {
     isMuted: boolean;
@@ -133,18 +153,31 @@ export interface Participant {
   addedByName?: string | null;
 }
 
+export interface MediaItemFile {
+  url: string;
+  thumbnailUrl?: string;
+  fileName: string;
+  fileSize?: number | null;
+  mimeType: string;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+  type: string;
+}
+
 export interface MediaItem {
   messageId: number;
   type: string;
   url: string;
   thumbnailUrl?: string;
   fileName: string;
-  fileSize: number;
+  fileSize?: number | null;
   timestamp: string;
   sender: {
     id: number;
     displayName: string;
   };
+  items: MediaItemFile[];
 }
 
 export interface ConversationDetailResponse {
@@ -176,7 +209,7 @@ export class ConversationService {
   constructor(
     private http: HttpClient,
     private tokenService: TokenService
-  ) { }
+  ) { console.log("Constructing Conversation Service..."); }
 
   getConversations(limit: number = 20, offset: number = 0, filter?: string): Observable<ConversationResponse> {
     let url = `${this.API_URL}?limit=${limit}&offset=${offset}`;
@@ -207,6 +240,23 @@ export class ConversationService {
     }
     const url = `${environment.apiBaseUrl}media/upload`;
     return this.http.post(url, formData, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  uploadMediaBatch(conversationId: string | null, files: File[]): Observable<any> {
+    const formData = new FormData();
+    files.forEach(f => formData.append('files', f));
+    if (conversationId) formData.append('conversationId', conversationId);
+    const url = `${environment.apiBaseUrl}media/upload/batch`;
+    return this.http.post(url, formData, { headers: this.tokenService.getAuthHeaders() });
+  }
+
+  sendMessageWithAttachments(conversationId: string, payload: {
+    messageType: string;
+    content: string;
+    attachments: MessageAttachment[];
+  }): Observable<any> {
+    const url = `${this.API_URL}/${conversationId}/messages`;
+    return this.http.post(url, payload, { headers: this.tokenService.getAuthHeaders() });
   }
 
   createConversation(request: CreateConversationRequest): Observable<CreateConversationResponse> {

@@ -27,6 +27,8 @@ export class ChatLayoutComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit() {
+    console.log("ChatLayout constructed...");
+
     this.chatService.initializeConversations();
     this.userService.loadCurrentUser().subscribe();
     this.chatService.showNewChatView$.subscribe(show => { this.showNewChatView = show; });

@@ -12,9 +12,7 @@
           <img [src]="currentChat?.avatar || 'assets/google.svg'" class="w-10 h-10 rounded-full object-cover"
             alt="chat" />
           <div>
-            <h3 class="font-semibold text-gray-900 dark:text-gray-100">
-              {{ getChatName() }}
-            </h3>
+            <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ getChatName() }}</h3>
             <p *ngIf="currentChat?.type !== 'GROUP'" class="text-xs" [class.text-green-600]="isCurrentChatOnline()"
               [class.dark:text-green-400]="isCurrentChatOnline()" [class.text-gray-500]="!isCurrentChatOnline()"
               [class.dark:text-gray-400]="!isCurrentChatOnline()">
@@ -24,10 +22,12 @@
         </div>
       </div>
       <div class="flex items-center gap-2 text-gray-600 dark:text-gray-300">
-        <button (click)="startCall('VIDEO')" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <button (click)="startCall('VIDEO')"
+          class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
           <i class="fas fa-video text-lg"></i>
         </button>
-        <button (click)="startCall('VOICE')" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <button (click)="startCall('VOICE')"
+          class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
           <i class="fas fa-phone text-lg"></i>
         </button>
         <button class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
@@ -65,10 +65,11 @@
           {{ stickyDate }}
         </span>
       </div>
-      <!-- Loading indicator for older messages -->
+      <!-- Loading indicator -->
       <div *ngIf="isLoadingMessages" class="flex justify-center py-2">
         <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-600"></div>
       </div>
+
       <div class="space-y-2">
         <ng-container *ngFor="let msg of filteredMessages; let i = index">
           <!-- Date Separator -->
@@ -79,7 +80,7 @@
             </span>
           </div>
 
-          <!-- System Message (add/remove events) -->
+          <!-- System Message -->
           <div *ngIf="msg.messageType === 'SYSTEM'" class="flex justify-center my-1">
             <span class="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs px-3 py-1 rounded-full">
               {{ msg.content }}
@@ -90,12 +91,13 @@
           <div *ngIf="msg.messageType !== 'SYSTEM'" class="flex mb-1" [class.justify-end]="isCurrentUser(msg.senderId)"
             [class.justify-start]="!isCurrentUser(msg.senderId)">
             <div class="flex gap-1 max-w-[80%] min-w-0" [class.flex-row-reverse]="isCurrentUser(msg.senderId)">
-              <!-- Avatar spacer: only in group chat for other users' messages -->
+              <!-- Avatar spacer -->
               <div *ngIf="isGroupChat() && !isCurrentUser(msg.senderId)" class="w-6 flex-shrink-0 self-start mt-0.5">
                 <img *ngIf="isFirstInSenderGroup(i)" [src]="msg.senderAvatar || 'assets/google.svg'"
                   class="w-6 h-6 rounded-full object-cover" [alt]="msg.senderName" />
               </div>
-              <div>
+
+              <div class="group relative">
                 <!-- Bubble -->
                 <div class="px-2 py-2 rounded-md shadow-sm" [class.bg-white]="!isCurrentUser(msg.senderId)"
                   [class.dark:bg-gray-700]="!isCurrentUser(msg.senderId)"
@@ -103,52 +105,159 @@
                   [class.dark:bg-green-600]="isCurrentUser(msg.senderId)"
                   [class.text-gray-800]="!isCurrentUser(msg.senderId)"
                   [class.dark:text-gray-100]="!isCurrentUser(msg.senderId)"
-                  [class.text-white]="isCurrentUser(msg.senderId)" (click)="!removedFromGroup && toggleReactionPicker(msg.id, $event)">
+                  [class.text-white]="isCurrentUser(msg.senderId)">
+
                   <p *ngIf="shouldShowSenderName(msg, i)" class="text-xs font-semibold mb-1 opacity-80">
-                    {{ getSenderDisplayName(msg) }}
+                    <ng-container *ngIf="msg.isContact !== false">{{ getSenderDisplayName(msg) }}</ng-container>
+                    <ng-container *ngIf="msg.isContact === false">
+                      <span>~{{ msg.senderName }}</span>
+                      <span class="font-normal opacity-70 ml-1">{{ msg.senderMobileNumber }}</span>
+                    </ng-container>
                   </p>
 
-                  <!-- Image Message -->
-                  <div *ngIf="msg.messageType === 'IMAGE' && msg.mediaMetadata" class="relative">
-                    <img [src]="
-                        msg.mediaMetadata.thumbnail ||
-                        'http://localhost:8080' + msg.mediaMetadata.thumbnail
-                      " [class.opacity-50]="msg.isUploading" [class.blur-sm]="msg.isUploading"
-                      class="max-w-xs rounded mb-2 cursor-pointer" alt="Image" />
+                  <!-- Multi-attachment grid (2+ files) -->
+                  <div *ngIf="msg.attachments && msg.attachments.length > 1" class="mb-1">
+
+                    <!-- Collapsed: thumbnail strip, no reaction badges, no emoji button -->
+                    <div *ngIf="expandedMsgId !== msg.id" class="relative cursor-pointer rounded overflow-hidden"
+                      style="max-width:20rem" (click)="toggleExpandGrid(msg.id, $event)">
+                      <div class="grid gap-0.5" [class.grid-cols-2]="msg.attachments.length !== 3"
+                        [class.grid-cols-1]="msg.attachments.length === 3">
+                        <ng-container *ngFor="let att of msg.attachments.slice(0,4); let ai = index">
+                          <div class="relative" [class.col-span-2]="msg.attachments.length === 3 && ai === 0">
+                            <img *ngIf="att.type === 'IMAGE'" [src]="att.fileUrl" class="w-full h-28 object-cover" />
+                            <div *ngIf="att.type === 'VIDEO'" class="relative h-28">
+                              <video [src]="att.fileUrl" [poster]="att.thumbnailUrl"
+                                class="w-full h-full object-cover pointer-events-none"></video>
+                              <div class="absolute inset-0 flex items-center justify-center">
+                                <i class="fas fa-play text-white text-lg drop-shadow"></i>
+                              </div>
+                            </div>
+                            <div *ngIf="ai === 3 && msg.attachments.length > 4"
+                              class="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center text-white font-bold text-xl">
+                              +{{ msg.attachments.length - 4 }}
+                            </div>
+                          </div>
+                        </ng-container>
+                      </div>
+                      <div
+                        class="absolute top-1 right-1 bg-black bg-opacity-50 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                        {{ msg.attachments.length }} <i class="fas fa-images ml-0.5"></i>
+                      </div>
+                    </div>
+
+                    <!-- Expanded: full-width column, each cell individually reactable -->
+                    <div *ngIf="expandedMsgId === msg.id" style="width:20rem">
+                      <button
+                        class="w-full flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-2 px-0.5"
+                        (click)="toggleExpandGrid(msg.id, $event)">
+                        <span>{{ msg.attachments.length }} files</span>
+                        <i class="fas fa-chevron-up"></i>
+                      </button>
+                      <div class="flex flex-col gap-3">
+                        <ng-container *ngFor="let att of msg.attachments; let ai = index">
+                          <div>
+                            <div class="group/cell relative rounded overflow-hidden w-full h-52">
+                              <img *ngIf="att.type === 'IMAGE'" [src]="att.fileUrl"
+                                class="w-full h-full object-cover cursor-pointer"
+                                (click)="openLightbox(msg.attachments, ai, $event)" />
+                              <div *ngIf="att.type === 'VIDEO'" class="w-full h-full cursor-pointer"
+                                (click)="openLightbox(msg.attachments, ai, $event)">
+                                <video [src]="att.fileUrl" [poster]="att.thumbnailUrl"
+                                  class="w-full h-full object-cover pointer-events-none"></video>
+                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                  <i class="fas fa-play text-white text-xl drop-shadow"></i>
+                                </div>
+                              </div>
+                              <button *ngIf="!removedFromGroup"
+                                class="absolute bottom-2 right-2 opacity-0 group-hover/cell:opacity-100 transition-opacity bg-black bg-opacity-60 rounded-full w-7 h-7 flex items-center justify-center text-sm z-20 shadow"
+                                (click)="toggleAttachmentReactionPicker(msg.id, ai, $event)">😊</button>
+                              <div
+                                *ngIf="activeReactionAttachment?.msgId === msg.id && activeReactionAttachment?.index === ai"
+                                class="absolute bottom-11 right-2 z-30 flex items-center gap-1 bg-white dark:bg-gray-700 rounded-full shadow-lg px-2 py-1 border border-gray-200 dark:border-gray-600"
+                                (click)="$event.stopPropagation()">
+                                <span *ngFor="let emoji of REACTIONS"
+                                  class="text-base cursor-pointer hover:scale-125 transition-transform select-none px-0.5"
+                                  (click)="sendAttachmentReaction(msg, ai, emoji, $event)">{{ emoji }}</span>
+                              </div>
+                            </div>
+                            <!-- reaction pills below the cell, not overlaid -->
+                            <div *ngIf="getGroupedAttachmentReactions(msg, att).length > 0"
+                              class="flex flex-wrap gap-1 mt-1">
+                              <span *ngFor="let group of getGroupedAttachmentReactions(msg, att)"
+                                class="flex items-center gap-0.5 bg-white dark:bg-gray-700 px-1.5 py-0.5 rounded-full shadow text-[11px] border cursor-pointer"
+                                [class.border-green-400]="group.hasCurrentUser"
+                                [class.border-gray-300]="!group.hasCurrentUser"
+                                (click)="sendAttachmentReaction(msg, ai, group.emoji, $event)">
+                                {{ group.emoji }}<span *ngIf="group.count > 1" class="font-semibold ml-0.5">{{
+                                  group.count }}</span>
+                              </span>
+                            </div>
+                          </div>
+                        </ng-container>
+                      </div>
+                      <button
+                        class="w-full flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-2 px-0.5"
+                        (click)="toggleExpandGrid(msg.id, $event)">
+                        <span>{{ msg.attachments.length }} files</span>
+                        <i class="fas fa-chevron-up"></i>
+                      </button>
+                    </div>
+
+                    <p *ngIf="msg.content" class="text-sm mt-1">{{ msg.content }}</p>
+                  </div>
+
+                  <!-- Single Image Message -->
+                  <div
+                    *ngIf="msg.messageType === 'IMAGE' && msg.mediaMetadata && !(msg.attachments && msg.attachments.length > 1)"
+                    class="relative">
+                    <img [src]="getMediaUrl(msg.mediaMetadata.thumbnail)"
+                      [class.opacity-50]="msg.isUploading || msg.isFailed"
+                      [class.blur-sm]="msg.isUploading || msg.isFailed" class="max-w-xs rounded mb-2 cursor-pointer"
+                      alt="Image"
+                      (click)="!msg.isUploading && !msg.isFailed && openLightbox([{fileUrl: getMediaUrl(msg.mediaUrl || msg.mediaMetadata.thumbnail), type: 'IMAGE'}], 0, $event)" />
                     <div *ngIf="msg.isUploading" class="absolute inset-0 flex items-center justify-center">
                       <div class="bg-black bg-opacity-50 rounded-full p-3">
                         <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
                       </div>
                     </div>
-                    <p *ngIf="msg.content" class="text-sm mt-1">
-                      {{ msg.content }}
-                    </p>
+                    <div *ngIf="msg.isFailed" class="absolute inset-0 flex items-center justify-center">
+                      <div class="bg-black bg-opacity-60 rounded-full p-3">
+                        <i class="fas fa-exclamation-triangle text-red-400 text-lg"></i>
+                      </div>
+                    </div>
+                    <p *ngIf="msg.content" class="text-sm mt-1">{{ msg.content }}</p>
                   </div>
 
                   <!-- Video Message -->
-                  <div *ngIf="msg.messageType === 'VIDEO' && msg.mediaMetadata" class="relative">
-                    <div class="relative">
-                      <video [src]="msg.mediaUrl || 'http://localhost:8080' + msg.mediaUrl"
-                        [poster]="msg.mediaMetadata.thumbnail" controls class="max-w-xs rounded mb-2"></video>
-                      <div *ngIf="msg.isUploading"
-                        class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded">
+                  <div *ngIf="msg.messageType === 'VIDEO' && !(msg.attachments && msg.attachments.length > 1)"
+                    class="relative">
+                    <div class="relative cursor-pointer rounded overflow-hidden bg-black"
+                      style="width:20rem; height:160px;"
+                      (click)="!msg.isUploading && !msg.isFailed && openLightbox([{fileUrl: getVideoUrl(msg), type: 'VIDEO', thumbnailUrl: getVideoThumb(msg)}], 0, $event)">
+                      <video [src]="getVideoUrl(msg)" class="w-full h-full object-cover pointer-events-none"
+                        preload="metadata" muted playsinline></video>
+                      <div class="absolute inset-0 flex items-center justify-center">
                         <div class="bg-black bg-opacity-50 rounded-full p-3">
-                          <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                          <i class="fas fa-play text-white text-xl"></i>
                         </div>
                       </div>
+                      <div *ngIf="msg.isUploading"
+                        class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                      </div>
+                      <div *ngIf="msg.isFailed"
+                        class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded">
+                        <i class="fas fa-exclamation-triangle text-red-400 text-2xl"></i>
+                      </div>
                     </div>
-                    <p *ngIf="msg.content" class="text-sm mt-1">
-                      {{ msg.content }}
-                    </p>
+                    <p *ngIf="msg.content" class="text-sm mt-1">{{ msg.content }}</p>
                   </div>
 
                   <!-- Audio Message -->
                   <div *ngIf="msg.messageType === 'AUDIO' && msg.mediaMetadata" class="min-w-[250px]">
-                    <audio [src]="msg.mediaUrl || 'http://localhost:8080' + msg.mediaUrl" controls
-                      class="w-full"></audio>
-                    <p *ngIf="msg.content" class="text-sm mt-1">
-                      {{ msg.content }}
-                    </p>
+                    <audio [src]="getMediaUrl(msg.mediaUrl)" controls class="w-full"></audio>
+                    <p *ngIf="msg.content" class="text-sm mt-1">{{ msg.content }}</p>
                   </div>
 
                   <!-- Document Message -->
@@ -160,39 +269,24 @@
                       <i class="fas fa-file-alt text-lg"></i>
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="text-sm font-medium truncate">
-                        {{ msg.mediaMetadata.fileName }}
-                      </p>
-                      <p class="text-xs opacity-70">
-                        {{ formatFileSize(msg.mediaMetadata.size) }}
-                      </p>
+                      <p class="text-sm font-medium truncate">{{ msg.mediaMetadata.fileName }}</p>
+                      <p class="text-xs opacity-70">{{ formatFileSize(msg.mediaMetadata.size) }}</p>
                     </div>
                     <i class="fas fa-download text-sm opacity-70"></i>
                   </div>
-                  <p *ngIf="msg.messageType === 'DOCUMENT' && msg.content" class="text-sm mt-2">
-                    {{ msg.content }}
-                  </p>
+                  <p *ngIf="msg.messageType === 'DOCUMENT' && msg.content" class="text-sm mt-2">{{ msg.content }}</p>
 
                   <!-- Text Content -->
                   <div class="flex items-end justify-between gap-2" *ngIf="msg.content && msg.messageType === 'TEXT'">
                     <span class="text-sm break-all">{{ msg.content }}</span>
                     <span class="text-[11px] opacity-60 whitespace-nowrap self-end flex items-center gap-0.5">
                       {{ formatTime(msg.createdAt) }}
-                      <i *ngIf="
-                          isCurrentUser(msg.senderId) &&
-                          msg.deliveryStatus.read > 0
-                        " class="fas fa-check-double text-[10px] text-blue-400 ml-0.5"></i>
-                      <i *ngIf="
-                          isCurrentUser(msg.senderId) &&
-                          msg.deliveryStatus.read === 0 &&
-                          msg.deliveryStatus.delivered > 0
-                        " class="fas fa-check-double text-[10px] ml-0.5"></i>
-                      <i *ngIf="
-                          isCurrentUser(msg.senderId) &&
-                          msg.deliveryStatus.read === 0 &&
-                          msg.deliveryStatus.delivered === 0 &&
-                          msg.deliveryStatus.sent > 0
-                        " class="fas fa-check text-[10px] ml-0.5"></i>
+                      <i *ngIf="isCurrentUser(msg.senderId) && msg.deliveryStatus.read > 0"
+                        class="fas fa-check-double text-[10px] text-blue-400 ml-0.5"></i>
+                      <i *ngIf="isCurrentUser(msg.senderId) && msg.deliveryStatus.read === 0 && msg.deliveryStatus.delivered > 0"
+                        class="fas fa-check-double text-[10px] ml-0.5"></i>
+                      <i *ngIf="isCurrentUser(msg.senderId) && msg.deliveryStatus.read === 0 && msg.deliveryStatus.delivered === 0 && msg.deliveryStatus.sent > 0"
+                        class="fas fa-check text-[10px] ml-0.5"></i>
                     </span>
                   </div>
 
@@ -211,13 +305,19 @@
                   </div>
                 </div>
 
+                <!-- Hover reaction trigger (single messages) -->
+                <button *ngIf="!removedFromGroup"
+                  class="absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-full w-6 h-6 flex items-center justify-center shadow text-xs"
+                  [class.-left-7]="isCurrentUser(msg.senderId)" [class.-right-7]="!isCurrentUser(msg.senderId)"
+                  (click)="toggleReactionPicker(msg.id, $event)">😊</button>
+
                 <!-- Emoji trigger + picker row -->
                 <div class="flex items-center gap-1 mt-0.5" [class.justify-start]="!isCurrentUser(msg.senderId)"
                   [class.justify-end]="isCurrentUser(msg.senderId)">
 
                   <!-- Existing reactions -->
                   <ng-container *ngIf="activeReactionMsgId !== msg.id">
-                    <span *ngFor="let group of getGroupedReactions(msg.reactions)"
+                    <span *ngFor="let group of getMessageLevelReactions(msg)"
                       class="flex items-center gap-0.5 bg-white dark:bg-gray-600 px-1 py-0.5 rounded-full shadow-sm text-[11px] border cursor-pointer hover:scale-110 transition-transform select-none"
                       [class.border-green-400]="group.hasCurrentUser" [class.border-gray-200]="!group.hasCurrentUser"
                       (click)="sendReaction(msg, group.emoji)">
@@ -239,24 +339,24 @@
           </div>
         </ng-container>
 
-        <!-- WhatsApp-style Typing Indicator -->
+        <!-- Typing Indicator -->
         <div *ngIf="isTyping && !removedFromGroup" class="flex justify-start">
           <div class="bg-white dark:bg-gray-700 px-3 py-2 rounded-lg shadow-sm max-w-[220px]">
-            <!-- One typer per row -->
             <div *ngFor="let user of typingList" class="flex items-center justify-between gap-2 mb-1">
               <ng-container *ngIf="user.isContact; else nonContact">
-                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">{{ user.displayName }}</span>
+                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">{{ user.displayName
+                  }}</span>
               </ng-container>
               <ng-template #nonContact>
-                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">~{{ user.displayName }}</span>
+                <span class="text-xs text-gray-700 dark:text-gray-200 font-medium truncate">~{{ user.displayName
+                  }}</span>
                 <span class="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{{ user.mobileNumber }}</span>
               </ng-template>
             </div>
-            <!-- Dots -->
             <div class="flex items-center gap-1.5 mt-1">
-              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0s;"></div>
-              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0.15s;"></div>
-              <div class="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-400 animate-bounce" style="animation-delay: 0.3s;"></div>
+              <div class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0s;"></div>
+              <div class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0.15s;"></div>
+              <div class="w-2 h-2 rounded-full bg-gray-400 animate-bounce" style="animation-delay: 0.3s;"></div>
             </div>
           </div>
         </div>
@@ -264,14 +364,12 @@
     </div>
 
     <div class="px-4 py-2 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
-      <!-- Removed from group banner -->
       <div *ngIf="removedFromGroup" class="py-3 text-center text-sm text-gray-500 dark:text-gray-400">
         <i class="fas fa-ban text-red-400 mr-1"></i>
         You were removed by <strong>{{ removedFromGroup.removedByName || 'Admin' }}</strong>
         <span class="mx-1">·</span>
         {{ removedFromGroup.removedAt | date:'mediumDate' }}
       </div>
-      <!-- Normal input -->
       <div *ngIf="!removedFromGroup" class="flex items-center gap-2">
         <button
           class="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
@@ -293,11 +391,11 @@
           <i class="fas fa-microphone text-xl" *ngIf="!newMessage.trim()"></i>
           <i class="fas fa-paper-plane text-lg" *ngIf="newMessage.trim()"></i>
         </button>
-      </div><!-- end *ngIf="!removedFromGroup" -->
+      </div>
     </div>
   </div>
 
-  <!-- Chat Info View (replaces entire chat window) -->
+  <!-- Chat Info View -->
   <div *ngIf="showChatInfo" class="h-full">
     <app-chat-info [chatId]="chatId" (close)="closeChatInfo()"></app-chat-info>
   </div>
@@ -306,80 +404,54 @@
   <div *ngIf="showMenuModal" class="fixed inset-0 z-40" (click)="closeMenuModal()">
     <div class="absolute top-14 right-4 bg-white dark:bg-gray-800 rounded-lg shadow-xl w-56 py-1 animate-fade-in"
       (click)="$event.stopPropagation()">
-
-      <!-- 1. View contact -->
       <button (click)="viewContact()"
-        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-        View contact
-      </button>
-
-      <!-- 2. Search -->
+        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">View
+        contact</button>
       <button (click)="openSearch()"
-        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-        Search
-      </button>
-
-      <!-- 3. Favourite -->
+        class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Search</button>
       <button (click)="toggleFavorite()"
         class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
         <span>{{ currentChat?.isFavorite ? 'Remove from favourites' : 'Add to favourites' }}</span>
         <i class="fas fa-star text-xs" [class.text-yellow-400]="currentChat?.isFavorite"
           [class.text-gray-400]="!currentChat?.isFavorite"></i>
       </button>
-
-      <!-- 4. Pin -->
       <button (click)="togglePin()"
         class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
         <span>{{ currentChat?.isPinned ? 'Unpin chat' : 'Pin chat' }}</span>
         <i class="fas fa-thumbtack text-xs" [class.text-green-500]="currentChat?.isPinned"
           [class.text-gray-400]="!currentChat?.isPinned"></i>
       </button>
-
-      <!-- 5. Archive -->
       <button (click)="toggleArchive()"
         class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
         <span>{{ currentChat?.isArchived ? 'Unarchive chat' : 'Archive chat' }}</span>
         <i class="fas fa-archive text-xs text-gray-400"></i>
       </button>
-
-      <!-- 6. Mute -->
       <button (click)="toggleMute()"
         class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
         <span>{{ currentChat?.isMuted ? 'Unmute notifications' : 'Mute notifications' }}</span>
         <i class="fas text-xs text-gray-400" [class.fa-bell-slash]="currentChat?.isMuted"
           [class.fa-bell]="!currentChat?.isMuted"></i>
       </button>
-
-      <!-- 7. More (expandable) -->
       <button (click)="toggleMore(); $event.stopPropagation()"
         class="w-full px-4 py-3 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-between">
         <span>More</span>
         <i class="fas text-xs" [class.fa-chevron-down]="!showMore" [class.fa-chevron-up]="showMore"></i>
       </button>
-
       <div *ngIf="showMore">
         <button
-          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          Report
-        </button>
+          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Report</button>
         <button (click)="blockContact()"
-          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          Block
-        </button>
+          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Block</button>
         <button
-          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          Disappearing messages
-        </button>
+          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Disappearing
+          messages</button>
         <button (click)="clearMessages()"
-          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          Clear messages
-        </button>
+          class="w-full px-6 py-2.5 text-left text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Clear
+          messages</button>
         <button (click)="deleteChat()"
-          class="w-full px-6 py-2.5 text-left text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-          Delete conversation
-        </button>
+          class="w-full px-6 py-2.5 text-left text-sm text-red-500 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Delete
+          conversation</button>
       </div>
-
     </div>
   </div>
 
@@ -389,52 +461,36 @@
     <div class="bg-white rounded-t-2xl p-6 w-full max-w-sm shadow-lg animate-slide-up"
       (click)="$event.stopPropagation()">
       <div class="grid grid-cols-5 gap-4 text-center">
-        <!-- Photo -->
         <label class="flex flex-col items-center cursor-pointer">
-          <div class="w-12 h-12 flex items-center justify-center bg-pink-100 rounded-full">
-            <i class="fas fa-image text-pink-600 text-lg"></i>
-          </div>
+          <div class="w-12 h-12 flex items-center justify-center bg-pink-100 rounded-full"><i
+              class="fas fa-image text-pink-600 text-lg"></i></div>
           <span class="text-xs mt-2">Photo</span>
-          <input #photoInput type="file" accept="image/*" hidden (change)="onFileSelected($event)" />
+          <input #photoInput type="file" accept="image/*" multiple hidden (change)="onFileSelected($event)" />
         </label>
-
-        <!-- Document -->
         <label class="flex flex-col items-center cursor-pointer">
-          <div class="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-full">
-            <i class="fas fa-file-alt text-blue-600 text-lg"></i>
-          </div>
+          <div class="w-12 h-12 flex items-center justify-center bg-blue-100 rounded-full"><i
+              class="fas fa-file-alt text-blue-600 text-lg"></i></div>
           <span class="text-xs mt-2">Document</span>
           <input #docInput type="file" accept=".pdf,.doc,.docx,.txt" hidden (change)="onFileSelected($event)" />
         </label>
-
-        <!-- Camera -->
         <label class="flex flex-col items-center cursor-pointer" (click)="openCameraAndMic()">
-          <div class="w-12 h-12 flex items-center justify-center bg-green-100 rounded-full">
-            <i class="fas fa-camera text-green-600 text-lg"></i>
-          </div>
+          <div class="w-12 h-12 flex items-center justify-center bg-green-100 rounded-full"><i
+              class="fas fa-camera text-green-600 text-lg"></i></div>
           <span class="text-xs mt-2">Camera</span>
         </label>
-
-        <!-- Video -->
         <label class="flex flex-col items-center cursor-pointer">
-          <div class="w-12 h-12 flex items-center justify-center bg-purple-100 rounded-full">
-            <i class="fas fa-video text-purple-600 text-lg"></i>
-          </div>
+          <div class="w-12 h-12 flex items-center justify-center bg-purple-100 rounded-full"><i
+              class="fas fa-video text-purple-600 text-lg"></i></div>
           <span class="text-xs mt-2">Video</span>
-          <input type="file" accept="video/*" hidden (change)="onFileSelected($event)" />
+          <input type="file" accept="video/*" multiple hidden (change)="onFileSelected($event)" />
         </label>
-
-        <!-- Audio -->
         <label class="flex flex-col items-center cursor-pointer">
-          <div class="w-12 h-12 flex items-center justify-center bg-orange-100 rounded-full">
-            <i class="fas fa-microphone text-orange-600 text-lg"></i>
-          </div>
+          <div class="w-12 h-12 flex items-center justify-center bg-orange-100 rounded-full"><i
+              class="fas fa-microphone text-orange-600 text-lg"></i></div>
           <span class="text-xs mt-2">Audio</span>
-          <input type="file" accept="audio/*" hidden (change)="onFileSelected($event)" />
+          <input type="file" accept="audio/*" multiple hidden (change)="onFileSelected($event)" />
         </label>
       </div>
-
-      <!-- Camera preview -->
       <div *ngIf="streamActive" class="mt-4">
         <video #video autoplay playsinline class="w-full rounded-lg shadow"></video>
         <button class="mt-3 w-full py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium"
@@ -442,23 +498,15 @@
           <i class="fas fa-camera mr-2"></i>Capture Photo
         </button>
       </div>
-
-      <!-- Captured photo preview -->
       <div *ngIf="capturedPhoto" class="mt-4">
         <img [src]="capturedPhoto" class="w-full rounded-lg shadow" alt="Captured">
         <div class="flex gap-2 mt-3">
           <button class="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium"
-            (click)="rejectPhoto()">
-            <i class="fas fa-times mr-2"></i>Retake
-          </button>
+            (click)="rejectPhoto()"><i class="fas fa-times mr-2"></i>Retake</button>
           <button class="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium"
-            (click)="acceptPhoto()">
-            <i class="fas fa-check mr-2"></i>Send
-          </button>
+            (click)="acceptPhoto()"><i class="fas fa-check mr-2"></i>Send</button>
         </div>
       </div>
-
-      <!-- Upload Progress with Image Preview -->
       <div *ngIf="isUploadingFile && uploadingImagePreview" class="mt-4 relative">
         <img [src]="uploadingImagePreview" class="w-full rounded-lg opacity-50 blur-sm" alt="Uploading">
         <div class="absolute inset-0 flex items-center justify-center">
@@ -468,19 +516,78 @@
         </div>
         <p class="text-sm text-gray-600 mt-2 text-center">Uploading...</p>
       </div>
-
-      <!-- Upload Progress without Preview -->
       <div *ngIf="isUploadingFile && !uploadingImagePreview" class="mt-4 text-center">
         <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
         <p class="text-sm text-gray-600 mt-2">Uploading...</p>
       </div>
-
-      <!-- Cancel -->
       <button *ngIf="!streamActive && !capturedPhoto"
         class="mt-6 w-full py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium"
-        (click)="closeAttachmentModal()" [disabled]="isUploadingFile">
-        Cancel
+        (click)="closeAttachmentModal()" [disabled]="isUploadingFile">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Media Preview Modal -->
+  <div *ngIf="showMediaPreview" class="fixed inset-0 bg-black bg-opacity-80 flex flex-col z-50">
+    <div class="flex items-center justify-between px-4 py-3 bg-gray-900 text-white">
+      <button (click)="showMediaPreview = false; pendingMediaFiles = []" class="p-2 hover:bg-gray-700 rounded-full"><i
+          class="fas fa-times"></i></button>
+      <span class="text-sm font-medium">{{ pendingMediaFiles.length }} file{{ pendingMediaFiles.length > 1 ? 's' : '' }}
+        selected</span>
+      <button (click)="sendPendingMedia()"
+        class="px-4 py-1.5 bg-green-500 hover:bg-green-600 rounded-full text-sm font-semibold">Send</button>
+    </div>
+    <div class="flex-1 overflow-y-auto flex flex-wrap gap-3 p-4 justify-center items-start">
+      <div *ngFor="let item of pendingMediaFiles; let i = index" class="relative bg-gray-800 rounded-lg overflow-hidden"
+        style="width: 200px;">
+        <button (click)="removeMediaFile(i)"
+          class="absolute top-1 right-1 z-10 w-6 h-6 bg-black bg-opacity-60 text-white rounded-full text-xs flex items-center justify-center hover:bg-opacity-90"><i
+            class="fas fa-times"></i></button>
+        <img *ngIf="item.file.type.startsWith('image/')" [src]="item.previewUrl" class="w-full h-40 object-cover" />
+        <video *ngIf="item.file.type.startsWith('video/')" [src]="item.previewUrl" class="w-full h-40 object-cover"
+          muted></video>
+        <div *ngIf="!item.file.type.startsWith('image/') && !item.file.type.startsWith('video/')"
+          class="h-40 flex flex-col items-center justify-center text-gray-300">
+          <i class="fas fa-file-alt text-3xl mb-2"></i>
+          <p class="text-xs text-center px-2 truncate w-full">{{ item.file.name }}</p>
+        </div>
+        <input type="text" placeholder="Add caption..." [(ngModel)]="item.caption"
+          class="w-full bg-gray-700 text-white text-xs px-2 py-1.5 outline-none placeholder-gray-400" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Lightbox -->
+  <div *ngIf="showLightbox" class="fixed inset-0 bg-black bg-opacity-95 z-[60] flex flex-col" (click)="closeLightbox()">
+    <div class="flex items-center justify-between px-4 py-3 text-white" (click)="$event.stopPropagation()">
+      <span class="text-sm opacity-70">{{ lightboxIndex + 1 }} / {{ lightboxAttachments.length }}</span>
+      <button (click)="closeLightbox()" class="p-2 hover:bg-white hover:bg-opacity-10 rounded-full"><i
+          class="fas fa-times text-lg"></i></button>
+    </div>
+    <div class="flex-1 flex items-center justify-center relative" (click)="$event.stopPropagation()">
+      <button *ngIf="lightboxAttachments.length > 1" (click)="prevSlide($event)"
+        class="absolute left-3 z-10 w-10 h-10 bg-black bg-opacity-40 hover:bg-opacity-70 rounded-full flex items-center justify-center text-white">
+        <i class="fas fa-chevron-left"></i>
       </button>
+      <img *ngIf="lightboxAttachments[lightboxIndex]?.type === 'IMAGE'"
+        [src]="lightboxAttachments[lightboxIndex].fileUrl" class="max-h-full max-w-full object-contain rounded" />
+      <video *ngIf="lightboxAttachments[lightboxIndex]?.type === 'VIDEO'"
+        [src]="lightboxAttachments[lightboxIndex].fileUrl" controls autoplay
+        class="max-h-full max-w-full rounded"></video>
+      <button *ngIf="lightboxAttachments.length > 1" (click)="nextSlide($event)"
+        class="absolute right-3 z-10 w-10 h-10 bg-black bg-opacity-40 hover:bg-opacity-70 rounded-full flex items-center justify-center text-white">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    </div>
+    <div *ngIf="lightboxAttachments.length > 1" class="flex gap-2 justify-center p-3 overflow-x-auto"
+      (click)="$event.stopPropagation()">
+      <div *ngFor="let att of lightboxAttachments; let ti = index"
+        class="w-12 h-12 flex-shrink-0 rounded overflow-hidden cursor-pointer border-2 transition-all"
+        [class.border-white]="ti === lightboxIndex" [class.border-transparent]="ti !== lightboxIndex"
+        (click)="lightboxIndex = ti">
+        <img *ngIf="att.type === 'IMAGE'" [src]="att.fileUrl" class="w-full h-full object-cover" />
+        <div *ngIf="att.type === 'VIDEO'" class="w-full h-full bg-gray-700 flex items-center justify-center"><i
+            class="fas fa-play text-white text-xs"></i></div>
+      </div>
     </div>
   </div>
 </div>
@@ -490,56 +597,35 @@
     class="flex flex-col items-center justify-center h-full bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">
     <div class="text-center" *ngIf="activeFilter === 'all'">
       <i class="fas fa-comments text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
-      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">
-        WhatsApp Web
-      </h2>
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">WhatsApp Web</h2>
       <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
         Send and receive messages without keeping your phone online.<br />
         Use WhatsApp on up to 4 linked devices and 1 phone at the same time.
       </p>
       <div class="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-500">
-        <i class="fas fa-lock"></i>
-        <span>End-to-end encrypted</span>
+        <i class="fas fa-lock"></i><span>End-to-end encrypted</span>
       </div>
     </div>
-
     <div class="text-center" *ngIf="activeFilter === 'favorite'">
       <i class="fas fa-star text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
-      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">
-        No Favourite Chats
-      </h2>
-      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
-        Mark conversations as favourite to see them here.
-      </p>
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">No Favourite Chats</h2>
+      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">Mark conversations as favourite to see them here.</p>
     </div>
-
     <div class="text-center" *ngIf="activeFilter === 'archived'">
       <i class="fas fa-archive text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
-      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">
-        No Archived Chats
-      </h2>
-      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
-        Archive conversations to keep your chat list organized.
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">No Archived Chats</h2>
+      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">Archive conversations to keep your chat list organized.
       </p>
     </div>
-
     <div class="text-center" *ngIf="activeFilter === 'pinned'">
       <i class="fas fa-thumbtack text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
-      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">
-        No Pinned Chats
-      </h2>
-      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
-        Pin conversations to quickly access them here.
-      </p>
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">No Pinned Chats</h2>
+      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">Pin conversations to quickly access them here.</p>
     </div>
-
     <div class="text-center" *ngIf="activeFilter === 'muted'">
       <i class="fas fa-bell-slash text-6xl mb-6 text-gray-300 dark:text-gray-600"></i>
-      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">
-        No Muted Chats
-      </h2>
-      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">
-        Mute notifications for conversations to see them here.
+      <h2 class="text-2xl font-light mb-2 text-gray-600 dark:text-gray-300">No Muted Chats</h2>
+      <p class="text-sm mb-6 max-w-md mx-auto leading-relaxed">Mute notifications for conversations to see them here.
       </p>
     </div>
   </div>

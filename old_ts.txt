@@ -1,0 +1,1126 @@
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild } from '@angular/core';
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+import { PresenceService } from 'src/app/core/services/presence.service';
+import { TokenService } from 'src/app/core/services/token.service';
+import { TypingIndicatorService, TypingUser } from 'src/app/core/services/typing-indicator.service';
+import { CallService } from '../../call/services/call.service';
+import { MessageAttachment } from '../services/conversation.service';
+import { Chat, ChatService } from '../services/chat.service';
+import { ConversationMessage, ConversationService } from '../services/conversation.service';
+import { WebSocketService } from '../services/websocket.service';
+import { ToastService } from 'src/app/shared/services/toast.service';
+
+@Component({
+  selector: 'app-chat-window',
+  templateUrl: './chat-window.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class ChatWindowComponent implements OnInit, OnDestroy {
+  @Input() isMobile = false;
+  @Output() backToList = new EventEmitter<void>();
+  chatId: string | null = null;
+  currentChat: Chat | null = null;
+  conversationType: string = 'INDIVIDUAL';
+  newMessage: string = '';
+  showAttachmentModal = false;
+  showChatInfo = false;
+  pendingMediaFiles: { file: File; previewUrl: string; caption: string }[] = [];
+  showMediaPreview = false;
+  showMenuModal = false;
+  showSearch = false;
+  showMore = false;
+  searchQuery = '';
+  searchResultCount = 0;
+  showImageModal = false;
+  selectedImage: string = '';
+  activeFilter: string = 'all';
+  messages: ConversationMessage[] = [];
+  isUploadingFile = false;
+  uploadingImagePreview: string | null = null;
+  stream: MediaStream | null = null;
+  streamActive = false;
+  capturedPhoto: string | null = null;
+  isLoadingMessages = false;
+  hasMoreMessages = true;
+  stickyDate = '';
+  showStickyDate = false;
+  removedFromGroup: { removedByName: string; removedAt: string } | null = null;
+  private scrollTimeout: any;
+  private destroy$ = new Subject<void>();
+  private chatSwitch$ = new Subject<void>();
+  isTyping = false;
+  typingText = '';
+  typingList: TypingUser[] = [];
+  private isAutoScrolling = false;
+  activeReactionMsgId: number | null = null;
+  activeReactionAttachment: { msgId: number; index: number } | null = null;
+  hoveredAttachment: { msgId: number; index: number } | null = null;
+  readonly REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+  lightboxAttachments: any[] = [];
+  lightboxIndex = 0;
+  showLightbox = false;
+  expandedMsgId: number | null = null;
+
+  @ViewChild('video') videoElement!: ElementRef<HTMLVideoElement>;
+  @ViewChild('messagesContainer') messagesContainer!: ElementRef<HTMLDivElement>;
+
+  constructor(
+    private chatService: ChatService,
+    private conversationService: ConversationService,
+    private tokenService: TokenService,
+    private webSocketService: WebSocketService,
+    private presenceService: PresenceService,
+    private typingIndicatorService: TypingIndicatorService,
+    private cdr: ChangeDetectorRef,
+    private callService: CallService,
+    private toastService: ToastService
+  ) { }
+
+  ngOnInit(): void {
+    console.log("ChatWindow constructed...");
+    this.chatService.selectedChatId$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(chatId => {
+        this.chatId = chatId;
+        this.showChatInfo = false;
+        this.loadCurrentChat();
+      });
+
+    this.chatService.activeFilter$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(filter => {
+        this.activeFilter = filter;
+      });
+
+    // Subscribe to WebSocket messages
+    this.webSocketService.message$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(message => {
+        if (message && this.chatId && message.conversationId === parseInt(this.chatId)) {
+          this.addMessageToList(message);
+          const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+          if (message.senderId !== currentUserId) {
+            this.webSocketService.markConversationAsRead(parseInt(this.chatId));
+          }
+        }
+      });
+
+    // Subscribe to reaction updates on dedicated queue
+    this.webSocketService.reaction$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => this.handleReactionUpdate(event));
+
+    // Subscribe to message status updates (tick updates for sent messages)
+    this.webSocketService.messageStatus$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(statusUpdate => {
+        if (statusUpdate.status === 'READ' && this.chatId &&
+          statusUpdate.conversationId === parseInt(this.chatId)) {
+          // Mark all messages in this conversation as read
+          this.messages.forEach(m => {
+            if (this.isCurrentUser(m.senderId)) {
+              m.deliveryStatus = { ...m.deliveryStatus, delivered: 1, read: 1 };
+            }
+          });
+          this.cdr.markForCheck();
+        } else if (statusUpdate.status === 'DELIVERED' && this.chatId &&
+          statusUpdate.conversationId === parseInt(this.chatId)) {
+          this.messages.forEach(m => {
+            if (this.isCurrentUser(m.senderId) && m.deliveryStatus.read === 0) {
+              m.deliveryStatus = { ...m.deliveryStatus, delivered: 1 };
+            }
+          });
+          this.cdr.markForCheck();
+        }
+      });
+
+    this.presenceService.presence$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.cdr.markForCheck());
+
+    // Subscribe to typing indicators
+    this.typingIndicatorService.typingUsers$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        if (this.chatId) {
+          this.isTyping = this.typingIndicatorService.isAnyoneTyping(parseInt(this.chatId));
+          this.typingText = this.typingIndicatorService.getTypingText(parseInt(this.chatId));
+          this.typingList = this.typingIndicatorService.getTypingList(parseInt(this.chatId));
+          if (this.isTyping) {
+            setTimeout(() => this.scrollToBottom(), 100);
+          }
+        }
+      });
+
+    // Real-time removal from group
+    this.webSocketService.participantRemoved$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(event => {
+        if (!this.chatId || event.conversationId !== parseInt(this.chatId)) return;
+        const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+        if (event.removedUserId === currentUserId) {
+          this.removedFromGroup = { removedByName: event.removedByName, removedAt: event.removedAt };
+          this.chatService.markAsRemoved(this.chatId, event.removedAt, event.removedByName);
+        }
+      });
+
+    // Re-added to group — clear removed state (SYSTEM message in chat handles the visible notification)
+    this.webSocketService.conversationUpdate$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(payload => {
+        if (!this.chatId || payload.conversationId !== parseInt(this.chatId)) return;
+        if (payload.event === 'PARTICIPANT_READDED') {
+          this.removedFromGroup = null;
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+    this.chatSwitch$.complete();
+    this.stopCamera();
+    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+  }
+
+  loadCurrentChat() {
+    this.chatSwitch$.next();
+    if (this.chatId) {
+      this.chatService.chats$
+        .pipe(takeUntil(this.chatSwitch$), takeUntil(this.destroy$))
+        .subscribe(chats => {
+          this.currentChat = chats.find(chat => chat.id === this.chatId) || null;
+          if (this.currentChat?.removedAt) {
+            this.removedFromGroup = { removedByName: this.currentChat.removedByName || '', removedAt: this.currentChat.removedAt };
+          } else {
+            this.removedFromGroup = null;
+          }
+        });
+      this.loadMessages();
+
+      const conversationId = parseInt(this.chatId);
+      this.webSocketService.subscribeToConversation(conversationId);
+      this.typingIndicatorService.subscribeToConversation(conversationId);
+
+      this.chatService.clearUnreadCount(conversationId);
+      this.webSocketService.markConversationAsRead(conversationId);
+      this.showChatInfo = false;
+    }
+  }
+
+  loadMessages() {
+    if (this.chatId) {
+      this.messages = [];
+      this.hasMoreMessages = true;
+      this.isLoadingMessages = true;
+      this.conversationService.getConversationMessages(this.chatId, 200)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (response) => {
+            if (response.success) {
+              this.messages = response.data.messages.reverse();
+              this.hasMoreMessages = response.data.pagination.hasNext;
+              setTimeout(() => this.scrollToBottom(), 0);
+              this.markUnreadMessagesAsRead();
+            }
+            this.isLoadingMessages = false;
+            this.cdr.markForCheck();
+          },
+          error: (err) => {
+            console.error('Error loading messages:', err);
+            this.isLoadingMessages = false;
+            this.cdr.markForCheck();
+          }
+        });
+
+      this.chatService.chats$
+        .pipe(takeUntil(this.chatSwitch$), takeUntil(this.destroy$))
+        .subscribe(chats => {
+          const chat = chats.find(c => c.id === this.chatId);
+          this.conversationType = chat?.type || 'INDIVIDUAL';
+        });
+    }
+  }
+
+  private markUnreadMessagesAsRead() { /* handled in loadCurrentChat */ }
+
+  startCall(callType: 'VIDEO' | 'VOICE') {
+    if (!this.currentChat || !this.chatId) return;
+    const conversationId = parseInt(this.chatId);
+
+    // GROUP call — always fetch detail to get all participant IDs
+    if (this.currentChat.type === 'GROUP') {
+      this.conversationService.getConversationDetail(this.chatId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe(res => {
+          if (!res.success) return;
+          const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+          const participantIds = res.data.participants
+            .filter(p => p.userId !== currentUserId)
+            .map(p => p.userId);
+          if (!participantIds.length) return;
+          this.callService.initiateCall(callType, conversationId, participantIds);
+        });
+      return;
+    }
+
+    // INDIVIDUAL call — use cached otherUserId if available
+    const participantId = this.currentChat.otherUserId;
+    if (participantId) {
+      this.callService.initiateCall(callType, conversationId, [participantId]);
+      return;
+    }
+
+    // INDIVIDUAL — otherUserId not resolved yet, fetch detail
+    this.conversationService.getConversationDetail(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(res => {
+        if (!res.success) return;
+        const currentUserId = parseInt(this.tokenService.getUserId() || '0');
+        const other = res.data.participants.find(p => p.userId !== currentUserId);
+        if (!other) return;
+        this.chatService.patchOtherUserId(this.chatId!, other.userId);
+        this.callService.initiateCall(callType, conversationId, [other.userId]);
+      });
+  }
+
+  getChatName(): string {
+    return this.currentChat?.name || 'Unknown';
+  }
+
+  getChatOnlineStatus(): string {
+    if (!this.currentChat || this.currentChat.type === 'GROUP') return '';
+    if (this.currentChat.otherUserId) {
+      const presence = this.presenceService.getUserPresence(this.currentChat.otherUserId);
+      // console.log('[ChatWindow] getChatOnlineStatus for userId', this.currentChat.otherUserId, ':', presence);
+      const lastSeen = this.presenceService.getLastSeen(this.currentChat.otherUserId);
+      if (lastSeen) return lastSeen;
+    }
+    return this.currentChat.isOnline ? 'online' : this.getStaticLastSeen();
+  }
+
+  isCurrentChatOnline(): boolean {
+    if (this.currentChat?.otherUserId) {
+      const presence = this.presenceService.getUserPresence(this.currentChat.otherUserId);
+      if (presence) return presence.status === 'ONLINE';
+    }
+    return this.currentChat?.isOnline === true;
+  }
+
+  private getStaticLastSeen(): string {
+    if (!this.currentChat?.lastActiveAt) return '';
+    const lastActive = new Date(this.currentChat.lastActiveAt);
+    if (isNaN(lastActive.getTime())) return '';
+    const diffMins = Math.floor((Date.now() - lastActive.getTime()) / 60000);
+    if (diffMins < 1) return 'last seen just now';
+    if (diffMins < 60) return `last seen ${diffMins} minutes ago`;
+    if (diffMins < 1440) return `last seen ${Math.floor(diffMins / 60)} hours ago`;
+    return `last seen ${Math.floor(diffMins / 1440)} days ago`;
+  }
+
+  isCurrentUser(senderId: number): boolean {
+    const currentUserId = this.tokenService.getUserId();
+    return currentUserId ? senderId === parseInt(currentUserId) : false;
+  }
+
+  isGroupChat(): boolean {
+    return this.conversationType === 'GROUP';
+  }
+
+  shouldShowSenderName(msg: ConversationMessage, index: number): boolean {
+    if (!this.isGroupChat() || this.isCurrentUser(msg.senderId)) return false;
+    if (index === 0) return true;
+    return this.messages[index - 1].senderId !== msg.senderId;
+  }
+
+  isFirstInSenderGroup(index: number): boolean {
+    const msg = this.messages[index];
+    const prev = this.messages[index - 1];
+    if (!prev) return true;
+    return prev.senderId !== msg.senderId;
+  }
+
+  getSenderDisplayName(msg: ConversationMessage): string {
+    if (this.isCurrentUser(msg.senderId)) {
+      return 'You';
+    }
+    return msg.senderName;
+  }
+
+  formatTime(timestamp: string): string {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  shouldShowDateSeparator(msg: ConversationMessage, index: number): boolean {
+    if (index === 0) return true;
+    const currentDate = new Date(msg.createdAt).toDateString();
+    const previousDate = new Date(this.messages[index - 1].createdAt).toDateString();
+    return currentDate !== previousDate;
+  }
+
+  getDateLabel(timestamp: string): string {
+    const messageDate = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (messageDate.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (messageDate.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  }
+
+  onTyping() {
+    if (this.chatId) {
+      this.typingIndicatorService.startTyping(parseInt(this.chatId));
+    }
+  }
+
+  sendMessage() {
+    if (this.newMessage.trim() && this.chatId) {
+      const conversationId = parseInt(this.chatId);
+      this.typingIndicatorService.stopTyping(conversationId);
+      this.webSocketService.sendMessage(conversationId, { messageType: 'TEXT', content: this.newMessage });
+      this.newMessage = '';
+    }
+  }
+
+  private addMessageToList(message: any, skipIfDuplicate: boolean = true) {
+    if (skipIfDuplicate && this.messages.length > 0 && message.messageType !== 'TEXT') {
+      const lastMsg = this.messages[this.messages.length - 1];
+      const timeDiff = Math.abs(new Date(message.createdAt).getTime() - new Date(lastMsg.createdAt).getTime());
+      if (lastMsg.senderId === message.senderId && lastMsg.messageType === message.messageType && timeDiff < 3000) return;
+    }
+
+    const newMessage: ConversationMessage = {
+      id: message.id,
+      senderId: message.senderId,
+      senderName: message.senderName || 'Unknown',
+      senderMobileNumber: message.senderMobileNumber,
+      senderAvatar: message.senderAvatar || '',
+      content: message.content,
+      messageType: message.messageType,
+      isEdited: false,
+      deliveryStatus: message.deliveryStatus || { read: 0, delivered: 0, sent: 1 },
+      reactions: message.reactions || [],
+      mediaMetadata: message.mediaMetadata ? {
+        ...message.mediaMetadata,
+        thumbnail: message.mediaMetadata.thumbnail || message.mediaUrl
+      } : undefined,
+      mediaUrl: message.mediaUrl,
+      isUploading: message.isUploading || false,
+      attachments: message.attachments || undefined,
+      createdAt: message.createdAt || new Date().toISOString()
+    };
+    this.messages = [...this.messages, newMessage];
+    this.cdr.markForCheck();
+
+    if (this.chatId && newMessage.createdAt) {
+      this.chatService.updateChatLastMessage(
+        this.chatId,
+        newMessage.content || '',
+        newMessage.messageType,
+        newMessage.createdAt,
+        newMessage.senderId,
+        newMessage.senderName
+      );
+    }
+
+    setTimeout(() => this.scrollToBottom(), 0);
+  }
+
+  // ---------------------- Attachments ----------------------
+  openAttachmentModal() {
+    this.showAttachmentModal = true;
+  }
+
+  closeAttachmentModal() {
+    this.showAttachmentModal = false;
+    this.stopCamera();
+  }
+
+  openCameraAndMic() {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        this.stream = stream;
+        this.streamActive = true;
+        setTimeout(() => {
+          if (this.videoElement) {
+            this.videoElement.nativeElement.srcObject = stream;
+          }
+        }, 100);
+      })
+      .catch(err => console.error('Camera error:', err));
+  }
+
+  capturePhoto() {
+    if (!this.videoElement || !this.stream) return;
+
+    const video = this.videoElement.nativeElement;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d')?.drawImage(video, 0, 0);
+
+    this.capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
+    this.stopCamera();
+  }
+
+  acceptPhoto() {
+    if (!this.capturedPhoto) return;
+
+    fetch(this.capturedPhoto)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        this.capturedPhoto = null;
+        this.closeAttachmentModal();
+        this.processImageUpload(file);
+      });
+  }
+
+  rejectPhoto() {
+    this.capturedPhoto = null;
+    this.openCameraAndMic();
+  }
+
+  private stopCamera() {
+    if (this.stream) {
+      this.stream.getTracks().forEach(track => track.stop());
+      this.stream = null;
+      this.streamActive = false;
+    }
+  }
+
+
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0 || !this.chatId) return;
+
+    const files = Array.from(input.files);
+    this.pendingMediaFiles = files.map(file => ({
+      file,
+      previewUrl: (file.type.startsWith('image/') || file.type.startsWith('video/'))
+        ? URL.createObjectURL(file)
+        : '',
+      caption: ''
+    }));
+
+    this.closeAttachmentModal();
+    if (this.pendingMediaFiles.length === 1 && !files[0].type.startsWith('image/') && !files[0].type.startsWith('video/')) {
+      this.startUpload(files[0], input);
+      this.pendingMediaFiles = [];
+    } else {
+      this.showMediaPreview = true;
+      this.cdr.markForCheck();
+    }
+    input.value = '';
+  }
+
+  removeMediaFile(index: number) {
+    const removed = this.pendingMediaFiles.splice(index, 1);
+    if (removed[0]?.previewUrl.startsWith('blob:')) URL.revokeObjectURL(removed[0].previewUrl);
+    if (this.pendingMediaFiles.length === 0) this.showMediaPreview = false;
+  }
+
+  sendPendingMedia() {
+    if (!this.chatId || this.pendingMediaFiles.length === 0) return;
+    this.showMediaPreview = false;
+    const items = [...this.pendingMediaFiles];
+    this.pendingMediaFiles = [];
+    const caption = items[0].caption || '';
+
+    // Show optimistic uploading bubble
+    const firstItem = items[0];
+    this.isUploadingFile = true;
+    if (firstItem.file.type.startsWith('image/')) {
+      this.uploadingImagePreview = firstItem.previewUrl;
+    }
+    this.addMessageToList({
+      senderId: parseInt(this.tokenService.getUserId()!),
+      senderName: 'You',
+      senderMobileNumber: '',
+      senderAvatar: '',
+      content: caption,
+      messageType: items[0].file.type.startsWith('video/') ? 'VIDEO' : 'IMAGE',
+      isEdited: false,
+      deliveryStatus: { read: 0, delivered: 0, sent: 0 },
+      reactions: [],
+      mediaMetadata: { thumbnail: firstItem.previewUrl, fileName: firstItem.file.name, size: firstItem.file.size, mimeType: firstItem.file.type },
+      attachments: [],
+      isUploading: true,
+      createdAt: new Date().toISOString()
+    }, false);
+
+    this.conversationService.uploadMediaBatch(this.chatId, items.map(i => i.file))
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (res) => {
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
+
+          if (!res.success) {
+            this.messages = this.messages.map(m => m.isUploading ? { ...m, isUploading: false, isFailed: true } : m);
+            this.cdr.markForCheck();
+            return;
+          }
+
+          const uploadedFiles: any[] = res.data.files;
+          const attachments: MessageAttachment[] = uploadedFiles.map((f: any) => ({
+            fileUrl: f.fileUrl,
+            type: this.getMessageType(f.mimeType),
+            width: f.width || null,
+            height: f.height || null,
+            duration: f.duration || null,
+            thumbnailUrl: f.thumbnailUrl || f.fileUrl,
+            fileName: f.fileName,
+            mimeType: f.mimeType,
+            size: f.fileSize
+          }));
+
+          const dominantType = attachments.some(a => a.type === 'VIDEO') ? 'VIDEO' : 'IMAGE';
+
+          // Replace the optimistic bubble with the real message in one shot
+          const finalMsg: ConversationMessage = {
+            senderId: parseInt(this.tokenService.getUserId()!),
+            senderName: 'You',
+            senderMobileNumber: '',
+            senderAvatar: '',
+            content: caption,
+            messageType: dominantType,
+            isEdited: false,
+            deliveryStatus: { read: 0, delivered: 0, sent: 1 },
+            reactions: [],
+            mediaUrl: attachments[0].fileUrl,
+            mediaMetadata: { thumbnail: attachments[0].thumbnailUrl || attachments[0].fileUrl, fileName: attachments[0].fileName || '', size: attachments[0].size || 0, mimeType: attachments[0].mimeType || '' },
+            attachments,
+            createdAt: new Date().toISOString()
+          };
+          this.messages = [...this.messages.filter(m => !m.isUploading), finalMsg];
+          this.cdr.markForCheck();
+          setTimeout(() => this.scrollToBottom(), 0);
+
+          this.chatService.updateChatLastMessage(this.chatId!, caption, dominantType, finalMsg.createdAt, finalMsg.senderId, finalMsg.senderName);
+
+          this.webSocketService.sendMessage(parseInt(this.chatId!), {
+            messageType: dominantType,
+            content: caption,
+            attachments,
+            replyToMessageId: null
+          });
+        },
+        error: (err) => {
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
+          this.messages = this.messages.map(m => m.isUploading ? { ...m, isUploading: false, isFailed: true } : m);
+          this.cdr.markForCheck();
+          this.toastService.error('Failed to upload files: ' + (err.error?.message || err.message));
+        }
+      });
+  }
+
+  private processImageUpload(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.processImageUploadWithCaption(file, e.target?.result as string, '');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  private processImageUploadWithCaption(file: File, previewUrl: string, caption: string) {
+    this.isUploadingFile = true;
+    this.uploadingImagePreview = previewUrl;
+    this.addMessageToList({
+      senderId: parseInt(this.tokenService.getUserId()!),
+      senderName: 'You',
+      senderMobileNumber: '',
+      senderAvatar: '',
+      content: caption,
+      messageType: 'IMAGE',
+      isEdited: false,
+      deliveryStatus: { read: 0, delivered: 0, sent: 0 },
+      reactions: [],
+      mediaMetadata: { thumbnail: previewUrl, fileName: file.name, size: file.size, mimeType: file.type },
+      isUploading: true,
+      createdAt: new Date().toISOString()
+    }, false);
+    setTimeout(() => this.startUploadWithCaption(file, caption), 0);
+  }
+
+  private startUploadWithCaption(file: File, caption: string) {
+    this.startUpload(file, null, caption);
+  }
+
+  private startUpload(file: File, input: HTMLInputElement | null, caption: string = '') {
+    console.log('Upload started, isUploadingFile:', this.isUploadingFile);
+
+    this.conversationService.uploadMedia(this.chatId!, file)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          console.log('File uploaded:', response);
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
+
+          if (response.success) {
+            const messageType = this.getMessageType(file.type);
+            const mediaMetadata = {
+              fileName: response.data.fileName,
+              size: response.data.fileSize,
+              mimeType: response.data.mimeType,
+              thumbnail: response.data.thumbnailUrl || response.data.fileUrl,
+              width: response.data.width || null,
+              height: response.data.height || null,
+              duration: response.data.duration || null
+            };
+
+            const finalMsg: ConversationMessage = {
+              senderId: parseInt(this.tokenService.getUserId()!),
+              senderName: 'You',
+              senderMobileNumber: '',
+              senderAvatar: '',
+              content: caption,
+              messageType,
+              isEdited: false,
+              deliveryStatus: { read: 0, delivered: 0, sent: 1 },
+              reactions: [],
+              mediaUrl: response.data.fileUrl,
+              mediaMetadata,
+              createdAt: new Date().toISOString()
+            };
+            this.messages = [...this.messages.filter(m => !m.isUploading), finalMsg];
+            this.cdr.markForCheck();
+            setTimeout(() => this.scrollToBottom(), 0);
+            this.chatService.updateChatLastMessage(this.chatId!, caption, messageType, finalMsg.createdAt, finalMsg.senderId, finalMsg.senderName);
+
+            this.webSocketService.sendMessage(parseInt(this.chatId!), {
+              messageType,
+              content: caption,
+              mediaUrl: response.data.fileUrl,
+              mediaMetadata,
+              replyToMessageId: null
+            });
+          }
+          if (input) input.value = '';
+        },
+        error: (err) => {
+          console.error('Error uploading file:', err);
+          this.isUploadingFile = false;
+          this.uploadingImagePreview = null;
+          this.messages = this.messages.map(m => m.isUploading ? { ...m, isUploading: false, isFailed: true } : m);
+          this.cdr.markForCheck();
+          this.toastService.error('Failed to upload file: ' + (err.error?.message || err.message));
+          if (input) input.value = '';
+        }
+      });
+  }
+
+  private getMessageType(mimeType: string): string {
+    if (mimeType.startsWith('image/')) return 'IMAGE';
+    if (mimeType.startsWith('video/')) return 'VIDEO';
+    if (mimeType.startsWith('audio/')) return 'AUDIO';
+    return 'DOCUMENT';
+  }
+
+
+
+  private pendingReactions = new Set<string>();
+
+  getGroupedReactions(reactions: any[]): { emoji: string; count: number; hasCurrentUser: boolean }[] {
+    const currentUserId = parseInt(this.tokenService.getUserId()!);
+    const map = new Map<string, { count: number; hasCurrentUser: boolean }>();
+    for (const r of reactions) {
+      const entry = map.get(r.emoji) || { count: 0, hasCurrentUser: false };
+      entry.count++;
+      if (r.userId === currentUserId) entry.hasCurrentUser = true;
+      map.set(r.emoji, entry);
+    }
+    return Array.from(map.entries()).map(([emoji, v]) => ({ emoji, ...v }));
+  }
+
+  getMessageLevelReactions(msg: ConversationMessage): { emoji: string; count: number; hasCurrentUser: boolean }[] {
+    return this.getGroupedReactions(msg.reactions.filter(r => !r.attachmentId));
+  }
+
+  private handleReactionUpdate(event: any) {
+    const msg = this.messages.find(m => m.id === event.messageId);
+    if (!msg) return;
+    const reactorId = event.reactorId ?? event.userId ?? parseInt(this.tokenService.getUserId()!);
+    const reactorName = event.reactorName ?? '';
+    const attachmentId = event.attachmentId ?? null;
+
+    if (event.action === 'remove') {
+      msg.reactions = msg.reactions.filter(r =>
+        !(r.emoji === event.emoji && r.userId === reactorId && (r.attachmentId ?? null) === attachmentId)
+      );
+    } else {
+      // remove any previous reaction by this user for same scope (attachment or message)
+      msg.reactions = msg.reactions.filter(r =>
+        !(r.userId === reactorId && (r.attachmentId ?? null) === attachmentId)
+      );
+      msg.reactions.push({ emoji: event.emoji, userId: reactorId, displayName: reactorName, attachmentId, createdAt: new Date().toISOString() });
+    }
+    this.cdr.markForCheck();
+  }
+
+  @HostListener('document:click')
+  onDocumentClick() {
+    this.activeReactionMsgId = null;
+    this.activeReactionAttachment = null;
+  }
+
+  toggleExpandGrid(msgId: number | undefined, event: MouseEvent) {
+    event.stopPropagation();
+    this.expandedMsgId = this.expandedMsgId === msgId ? null : (msgId ?? null);
+  }
+
+  openLightbox(attachments: any[], index: number, event: MouseEvent) {
+    event.stopPropagation();
+    this.lightboxAttachments = attachments;
+    this.lightboxIndex = index;
+    this.showLightbox = true;
+  }
+
+  closeLightbox() { this.showLightbox = false; }
+
+  prevSlide(event: MouseEvent) {
+    event.stopPropagation();
+    this.lightboxIndex = (this.lightboxIndex - 1 + this.lightboxAttachments.length) % this.lightboxAttachments.length;
+  }
+
+  nextSlide(event: MouseEvent) {
+    event.stopPropagation();
+    this.lightboxIndex = (this.lightboxIndex + 1) % this.lightboxAttachments.length;
+  }
+
+  // ---------------------- Reactions ----------------------
+  toggleAttachmentReactionPicker(msgId: number | undefined, index: number, event: MouseEvent) {
+    event.stopPropagation();
+    if (this.activeReactionAttachment?.msgId === msgId && this.activeReactionAttachment?.index === index) {
+      this.activeReactionAttachment = null;
+    } else {
+      this.activeReactionAttachment = msgId != null ? { msgId, index } : null;
+    }
+  }
+
+  sendAttachmentReaction(msg: ConversationMessage, index: number, emoji: string, event: MouseEvent) {
+    event.stopPropagation();
+    if (!this.chatId || !msg.id) return;
+    const att = msg.attachments?.[index];
+    if (!att) return;
+    const attachmentId = att.id ?? null;
+    const currentUserId = parseInt(this.tokenService.getUserId()!);
+    const existing = msg.reactions.findIndex(r =>
+      r.userId === currentUserId && r.emoji === emoji && (r.attachmentId ?? null) === attachmentId
+    );
+    if (existing !== -1) {
+      msg.reactions.splice(existing, 1);
+      this.webSocketService.sendReaction(parseInt(this.chatId), msg.id, emoji, 'remove', attachmentId);
+    } else {
+      const prevIdx = msg.reactions.findIndex(r =>
+        r.userId === currentUserId && (r.attachmentId ?? null) === attachmentId
+      );
+      if (prevIdx !== -1) {
+        const prevEmoji = msg.reactions[prevIdx].emoji;
+        msg.reactions.splice(prevIdx, 1);
+        this.webSocketService.sendReaction(parseInt(this.chatId), msg.id, prevEmoji, 'remove', attachmentId);
+      }
+      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', attachmentId, createdAt: new Date().toISOString() });
+      this.webSocketService.sendReaction(parseInt(this.chatId), msg.id, emoji, 'add', attachmentId);
+    }
+    this.activeReactionAttachment = null;
+    this.cdr.markForCheck();
+  }
+
+  getGroupedAttachmentReactions(msg: ConversationMessage, att: MessageAttachment): { emoji: string; count: number; hasCurrentUser: boolean }[] {
+    const attachmentId = att.id ?? null;
+    const filtered = msg.reactions.filter(r => (r.attachmentId ?? null) === attachmentId);
+    return this.getGroupedReactions(filtered);
+  }
+
+  toggleReactionPicker(msgId: number | undefined, event: MouseEvent) {
+    event.stopPropagation();
+    this.activeReactionMsgId = this.activeReactionMsgId === msgId ? null : (msgId ?? null);
+  }
+
+  closeReactionPicker() {
+    this.activeReactionMsgId = null;
+  }
+
+  // kept for template compatibility (no-ops now)
+  showReactionPicker(_id: number | undefined) { }
+  hideReactionPicker() { }
+
+  sendReaction(msg: ConversationMessage, emoji: string) {
+    if (!this.chatId || !msg.id) return;
+    const conversationId = parseInt(this.chatId);
+    const currentUserId = parseInt(this.tokenService.getUserId()!);
+    // message-level reactions: attachmentId === null
+    const existing = msg.reactions.findIndex(r => r.userId === currentUserId && r.emoji === emoji && !r.attachmentId);
+    if (existing !== -1) {
+      msg.reactions.splice(existing, 1);
+      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'remove', null);
+    } else {
+      const prevIdx = msg.reactions.findIndex(r => r.userId === currentUserId && !r.attachmentId);
+      if (prevIdx !== -1) {
+        const prevEmoji = msg.reactions[prevIdx].emoji;
+        msg.reactions.splice(prevIdx, 1);
+        this.webSocketService.sendReaction(conversationId, msg.id, prevEmoji, 'remove', null);
+      }
+      msg.reactions.push({ emoji, userId: currentUserId, displayName: 'You', attachmentId: null, createdAt: new Date().toISOString() });
+      this.webSocketService.sendReaction(conversationId, msg.id, emoji, 'add', null);
+    }
+    this.activeReactionMsgId = null;
+  }
+
+  // ---------------------- Chat Info ----------------------
+  toggleChatInfo() {
+    this.showChatInfo = !this.showChatInfo;
+  }
+
+  closeChatInfo() {
+    this.showChatInfo = false;
+  }
+
+  get filteredMessages(): ConversationMessage[] {
+    if (!this.searchQuery.trim()) return this.messages;
+    const q = this.searchQuery.toLowerCase();
+    const results = this.messages.filter(m => m.content?.toLowerCase().includes(q));
+    // update count without triggering ExpressionChangedAfterItHasBeenCheckedError
+    Promise.resolve().then(() => { this.searchResultCount = results.length; });
+    return results;
+  }
+
+  // ---------------------- Menu Modal ----------------------
+  toggleMenuModal() {
+    this.showMenuModal = !this.showMenuModal;
+    this.showMore = false;
+  }
+
+  closeMenuModal() {
+    this.showMenuModal = false;
+    this.showMore = false;
+  }
+
+  toggleMore() {
+    this.showMore = !this.showMore;
+  }
+
+  viewContact() {
+    this.showMenuModal = false;
+    this.showChatInfo = true;
+  }
+
+  openSearch() {
+    this.showMenuModal = false;
+    this.showSearch = true;
+    this.searchQuery = '';
+    this.searchResultCount = 0;
+  }
+
+  toggleFavorite() {
+    if (!this.chatId) return;
+    const isFav = this.currentChat?.isFavorite;
+    const call = isFav
+      ? this.conversationService.unfavoriteConversation(this.chatId)
+      : this.conversationService.favoriteConversation(this.chatId);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.toggleChatFlag(this.chatId!, 'isFavorite');
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling favorite:', err)
+    });
+  }
+
+  toggleArchive() {
+    if (!this.chatId) return;
+    const isArchived = this.currentChat?.isArchived;
+    const call = isArchived
+      ? this.conversationService.unarchiveConversation(this.chatId)
+      : this.conversationService.archiveConversation(this.chatId);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.reloadConversations();
+        this.chatService.clearSelection();
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling archive:', err)
+    });
+  }
+
+  togglePin() {
+    if (!this.chatId) return;
+    const isPinned = this.currentChat?.isPinned;
+    const call = isPinned
+      ? this.conversationService.unpinConversation(this.chatId)
+      : this.conversationService.pinConversation(this.chatId);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.toggleChatFlag(this.chatId!, 'isPinned');
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling pin:', err)
+    });
+  }
+
+  toggleMute() {
+    if (!this.chatId) return;
+    const isMuted = this.currentChat?.isMuted;
+    const call = isMuted
+      ? this.conversationService.unmuteConversation(this.chatId)
+      : this.conversationService.muteConversation(this.chatId, null);
+    call.pipe(takeUntil(this.destroy$)).subscribe({
+      next: () => {
+        this.chatService.toggleChatFlag(this.chatId!, 'isMuted');
+        this.closeMenuModal();
+      },
+      error: (err) => console.error('Error toggling mute:', err)
+    });
+  }
+
+  blockContact() {
+    if (!this.chatId || !confirm('Block this contact? They will no longer be able to send you messages.')) return;
+    // Block is handled by deleting the conversation for now (no dedicated block endpoint in API)
+    this.conversationService.deleteConversation(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.chatService.removeChat(this.chatId!);
+          this.chatService.clearSelection();
+          this.closeMenuModal();
+        },
+        error: (err) => console.error('Error blocking contact:', err)
+      });
+  }
+
+  closeSearch() {
+    this.showSearch = false;
+    this.searchQuery = '';
+    this.searchResultCount = 0;
+  }
+
+  deleteChat() {
+    if (!this.chatId || !confirm('Delete this chat? This cannot be undone.')) return;
+    this.conversationService.deleteConversation(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.chatService.removeChat(this.chatId!);
+          this.chatService.clearSelection();
+          this.showMenuModal = false;
+        },
+        error: (err) => console.error('Error deleting conversation:', err)
+      });
+  }
+
+  clearMessages() {
+    if (!this.chatId || !confirm('Clear all messages? Only you will see this change.')) return;
+    this.conversationService.clearConversation(this.chatId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: () => {
+          this.messages = [];
+          this.chatService.updateChatLastMessage(this.chatId!, '', 'TEXT', new Date().toISOString());
+          this.showMenuModal = false;
+        },
+        error: (err) => console.error('Error clearing conversation:', err)
+      });
+  }
+
+  private scrollToBottom(): void {
+    if (this.messagesContainer) {
+      this.isAutoScrolling = true;
+      const element = this.messagesContainer.nativeElement;
+      element.scrollTop = element.scrollHeight;
+      setTimeout(() => {
+        this.isAutoScrolling = false;
+      }, 100);
+    }
+  }
+
+  downloadDocument(mediaUrl: string, fileName: string): void {
+    const url = mediaUrl.startsWith('http') ? mediaUrl : 'http://localhost:8080' + mediaUrl;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  onScroll(event: Event): void {
+    const element = event.target as HTMLElement;
+    if (element.scrollTop <= 10 && this.hasMoreMessages && !this.isLoadingMessages) {
+      this.loadMoreMessages();
+    }
+
+    this.showStickyDate = true;
+    this.updateStickyDate(element);
+
+    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
+    this.scrollTimeout = setTimeout(() => {
+      this.showStickyDate = false;
+    }, 1000);
+  }
+
+  private updateStickyDate(element: HTMLElement): void {
+    const dateSeparators = element.querySelectorAll('.date-separator');
+
+    for (let i = dateSeparators.length - 1; i >= 0; i--) {
+      const separator = dateSeparators[i] as HTMLElement;
+      const rect = separator.getBoundingClientRect();
+      const containerRect = element.getBoundingClientRect();
+
+      if (rect.top <= containerRect.top + 50) {
+        const dateText = separator.querySelector('span')?.textContent || '';
+        this.stickyDate = dateText;
+        break;
+      }
+    }
+  }
+
+  private loadMoreMessages(): void {
+    if (!this.chatId || this.isLoadingMessages || !this.hasMoreMessages) return;
+
+    this.isLoadingMessages = true;
+    const oldestMessageId = this.messages[0]?.id;
+
+    this.conversationService.getConversationMessages(this.chatId, 500, oldestMessageId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response) => {
+          if (response.success && response.data.messages.length > 0) {
+            const oldScrollHeight = this.messagesContainer.nativeElement.scrollHeight;
+            const newMessages = response.data.messages.reverse();
+            this.messages = [...newMessages, ...this.messages];
+            this.hasMoreMessages = response.data.pagination.hasNext;
+
+            setTimeout(() => {
+              const newScrollHeight = this.messagesContainer.nativeElement.scrollHeight;
+              this.messagesContainer.nativeElement.scrollTop = newScrollHeight - oldScrollHeight;
+            }, 0);
+          } else {
+            this.hasMoreMessages = false;
+          }
+          this.isLoadingMessages = false;
+        },
+        error: (err) => {
+          console.error('Error loading more messages:', err);
+          this.isLoadingMessages = false;
+        }
+      });
+  }
+}

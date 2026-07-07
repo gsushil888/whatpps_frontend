@@ -2,8 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
-import { environment } from 'src/environments/environment';
 import { TokenService } from 'src/app/core/services/token.service';
+import { environment } from 'src/environments/environment';
 
 export interface UserProfile {
   id: number;
@@ -42,7 +42,7 @@ export class UserService {
   constructor(
     private http: HttpClient,
     private tokenService: TokenService
-  ) { }
+  ) { console.log("Constructing User Service..."); }
 
   loadCurrentUser(): Observable<UserProfileResponse> {
     return this.http.get<UserProfileResponse>(this.API_URL, { headers: this.tokenService.getAuthHeaders() }).pipe(

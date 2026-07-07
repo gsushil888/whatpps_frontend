@@ -25,10 +25,11 @@ export class HomeLayoutComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
-    console.log("Home layout constructing....")
-    console.log("Connecting to Websocket...")
+    console.log("Constructed HomeLayout Component...")
 
+    console.log("Connecting to Websocket...")
     this.webSocketService.connect();
+
     this.updateBottomNav();
 
     this.chatService.selectedChatId$

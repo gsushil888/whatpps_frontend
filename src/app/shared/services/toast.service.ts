@@ -34,7 +34,7 @@ export class ToastService {
     const toast: Toast = { id: this.idCounter++, message, type };
     const current = this.toasts$.value;
     this.toasts$.next([...current, toast]);
-    setTimeout(() => this.remove(toast.id), 3000);
+    setTimeout(() => this.remove(toast.id), 5000);
   }
 
   remove(id: number) {

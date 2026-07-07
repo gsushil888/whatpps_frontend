@@ -1,7 +1,9 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://api.yourapp.com/api/v1/',
-  wsUrl: 'wss://api.yourapp.com/ws',
+  apiBaseUrl: 'http://localhost:8080/api/v1/',
+  wsUrl: 'http://localhost:8080/ws',
+  googleClientId: '33227048330-96tb616sbhubg1nj6n2ploqa2euo8d0o.apps.googleusercontent.com',
+  encryptionKey: 'zaqwsxcderfvbgtyhnmjuiklop123456', // must match backend app.encryption.secret
   rtc: {
     iceServers: [{ urls: ['stun:stun.l.google.com:19302'] }]
   }

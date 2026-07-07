@@ -1,5 +1,5 @@
-import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Component, Input, OnInit } from '@angular/core';
 
 @Component({
   selector: 'app-typing-indicator',
@@ -70,7 +70,10 @@ import { CommonModule } from '@angular/common';
     }
   `]
 })
-export class TypingIndicatorComponent {
+export class TypingIndicatorComponent implements OnInit {
+  ngOnInit(): void {
+    console.log("Constructed TypingIndicator Component...");
+  }
   @Input() show: boolean = false;
   @Input() text: string = 'typing...';
 }

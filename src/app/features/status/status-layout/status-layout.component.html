@@ -1,19 +1,20 @@
 <div class="flex flex-1 min-h-0 bg-white dark:bg-gray-900">
   <!-- Left Panel -->
   <div class="border-r border-gray-200 dark:border-gray-700 flex flex-col bg-white dark:bg-gray-800"
-    [class.hidden]="isMobile && selectedStatusId"
-    [style.width]="isMobile ? '100%' : '400px'">
-    <div class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between px-4">
+    [class.hidden]="isMobile && selectedStatusId" [style.width]="isMobile ? '100%' : '400px'">
+    <div
+      class="h-16 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex items-center justify-between px-4">
       <div class="flex items-center gap-3">
-        <button *ngIf="isMobile" (click)="goHome()" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+        <button *ngIf="isMobile" (click)="goHome()"
+          class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
           <i class="fas fa-arrow-left text-gray-600 dark:text-gray-300"></i>
         </button>
         <img src="assets/google.svg" class="w-10 h-10 rounded-full" alt="profile" />
         <h1 class="font-semibold text-gray-800 dark:text-gray-200">Status</h1>
       </div>
-      <button class="flex items-center justify-center w-8 h-8 bg-green-600 dark:bg-green-500 rounded-full hover:bg-green-700 dark:hover:bg-green-600 transition-colors">
+      <!-- <button class="flex items-center justify-center w-8 h-8 bg-green-600 dark:bg-green-500 rounded-full hover:bg-green-700 dark:hover:bg-green-600 transition-colors">
         <i class="fas fa-plus text-white text-sm"></i>
-      </button>
+      </button> -->
     </div>
     <div class="flex-1 min-h-0 overflow-y-auto">
       <app-status-list></app-status-list>
@@ -21,15 +22,15 @@
   </div>
 
   <!-- Right Panel -->
-  <div class="flex-1 min-h-0 bg-gray-50 dark:bg-gray-900"
-    [class.hidden]="isMobile && !selectedStatusId">
+  <div class="flex-1 min-h-0 flex flex-col bg-gray-50 dark:bg-gray-900" [class.hidden]="isMobile && !selectedStatusId">
     <!-- Back arrow on mobile -->
     <div *ngIf="isMobile && selectedStatusId"
-      class="h-12 px-4 flex items-center bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
-      <button (click)="clearSelection()" class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
+      class="h-12 shrink-0 px-4 flex items-center bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+      <button (click)="clearSelection()"
+        class="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full transition-colors">
         <i class="fas fa-arrow-left text-gray-600 dark:text-gray-300"></i>
       </button>
     </div>
-    <app-status-viewer></app-status-viewer>
+    <app-status-viewer class="flex-1 min-h-0 flex flex-col"></app-status-viewer>
   </div>
 </div>

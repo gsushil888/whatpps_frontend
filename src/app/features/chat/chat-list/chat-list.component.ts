@@ -1,10 +1,11 @@
 import { ChangeDetectorRef, Component, OnDestroy, OnInit } from '@angular/core';
 import { Subject } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+import { Contact } from 'src/app/core/models/contact.model';
 import { PresenceService } from 'src/app/core/services/presence.service';
 import { TokenService } from 'src/app/core/services/token.service';
 import { Chat, ChatService } from '../services/chat.service';
-import { Contact, ContactService } from '../services/contact.service';
+import { ContactService } from '../services/contact.service';
 import { ConversationService } from '../services/conversation.service';
 
 @Component({
@@ -50,7 +51,8 @@ export class ChatListComponent implements OnInit, OnDestroy {
   ) { }
 
   ngOnInit(): void {
-    console.log("Constructing chat list......");
+    console.log("ChatList constructed...");
+
     this.currentUserId = parseInt(this.tokenService.getUserId() || '0');
 
     this.chatService.chats$.pipe(
@@ -89,12 +91,15 @@ export class ChatListComponent implements OnInit, OnDestroy {
 
   applyFilter() {
     const q = this.listFilter.toLowerCase().trim();
+    const base = this.activeFilter === 'All'
+      ? this.chats.filter(c => !c.isArchived)
+      : this.chats;
     this.filteredChats = q
-      ? this.chats.filter(c =>
+      ? base.filter(c =>
         c.name.toLowerCase().includes(q) ||
         (c.lastMessage || '').toLowerCase().includes(q)
       )
-      : this.chats;
+      : base;
     this.filteredContacts = q
       ? this.contacts.filter(c =>
         c.displayName.toLowerCase().includes(q) ||
